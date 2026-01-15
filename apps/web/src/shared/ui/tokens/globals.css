@@ -1,0 +1,196 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* AG Grid Styles */
+@import "ag-grid-community/styles/ag-grid.css";
+@import "ag-grid-community/styles/ag-theme-alpine.css";
+
+:root {
+  /* Deep Teal - Primary Color Palette */
+  --primary-50: oklch(0.97 0.02 195);
+  --primary-100: oklch(0.93 0.04 195);
+  --primary-200: oklch(0.85 0.08 195);
+  --primary-300: oklch(0.75 0.12 195);
+  --primary-400: oklch(0.62 0.14 195);
+  --primary-500: oklch(0.52 0.13 195); /* Main Deep Teal */
+  --primary-600: oklch(0.45 0.12 195);
+  --primary-700: oklch(0.38 0.1 195);
+  --primary-800: oklch(0.3 0.08 195);
+  --primary-900: oklch(0.22 0.05 195);
+
+  /* Royal Indigo - Secondary Color Palette */
+  --secondary-50: oklch(0.96 0.03 280);
+  --secondary-100: oklch(0.92 0.06 280);
+  --secondary-200: oklch(0.84 0.1 280);
+  --secondary-300: oklch(0.73 0.14 280);
+  --secondary-400: oklch(0.6 0.16 280);
+  --secondary-500: oklch(0.48 0.15 280); /* Main Royal Indigo */
+  --secondary-600: oklch(0.4 0.13 280);
+  --secondary-700: oklch(0.33 0.11 280);
+  --secondary-800: oklch(0.26 0.09 280);
+  --secondary-900: oklch(0.2 0.06 280);
+
+  /* Semantic Colors */
+  --success: oklch(0.65 0.18 150);
+  --warning: oklch(0.75 0.15 70);
+  --error: oklch(0.6 0.22 25);
+  --info: oklch(0.6 0.15 240);
+
+  /* Neutral Colors */
+  --background: oklch(0.99 0 0);
+  --foreground: oklch(0.18 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0 0);
+
+  /* Design Tokens */
+  --primary: var(--primary-500);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: var(--secondary-500);
+  --secondary-foreground: oklch(1 0 0);
+  --muted: oklch(0.96 0 0);
+  --muted-foreground: oklch(0.55 0 0);
+  --accent: var(--primary-100);
+  --accent-foreground: var(--primary-900);
+  --destructive: var(--error);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.9 0 0);
+  --input: oklch(0.9 0 0);
+  --ring: var(--primary-500);
+
+  /* Chart Colors */
+  --chart-1: var(--primary-500);
+  --chart-2: var(--secondary-500);
+  --chart-3: var(--success);
+  --chart-4: var(--warning);
+  --chart-5: var(--info);
+
+  /* EPM Semantic Colors */
+  --positive: var(--success);
+  --negative: var(--error);
+  --budget: oklch(0.6 0.15 240); /* blue */
+  --forecast: oklch(0.65 0.15 280); /* purple */
+  --actual: var(--primary-500);
+
+  /* Confidence Level Colors */
+  --confidence-s: oklch(0.65 0.18 150); /* green - 受注確定 */
+  --confidence-a: oklch(0.7 0.16 130); /* lime - 80%見込 */
+  --confidence-b: oklch(0.75 0.15 85); /* yellow - 50%見込 */
+  --confidence-c: oklch(0.7 0.16 50); /* orange - 20%見込 */
+  --confidence-d: oklch(0.6 0.22 25); /* red - 案件化中 */
+  --confidence-z: oklch(0.55 0 0); /* gray - 目安なし */
+
+  /* Scenario Colors */
+  --scenario-worst: var(--error);
+  --scenario-normal: oklch(0.6 0.15 240); /* blue */
+  --scenario-best: var(--success);
+
+  /* Radius */
+  --radius: 0.5rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  /* Deep Teal - Primary for Dark Mode */
+  --primary-50: oklch(0.22 0.05 195);
+  --primary-100: oklch(0.3 0.08 195);
+  --primary-200: oklch(0.38 0.1 195);
+  --primary-300: oklch(0.45 0.12 195);
+  --primary-400: oklch(0.52 0.13 195);
+  --primary-500: oklch(0.62 0.14 195); /* Main Deep Teal (lighter for dark) */
+  --primary-600: oklch(0.75 0.12 195);
+  --primary-700: oklch(0.85 0.08 195);
+  --primary-800: oklch(0.93 0.04 195);
+  --primary-900: oklch(0.97 0.02 195);
+
+  /* Royal Indigo - Secondary for Dark Mode */
+  --secondary-50: oklch(0.2 0.06 280);
+  --secondary-100: oklch(0.26 0.09 280);
+  --secondary-200: oklch(0.33 0.11 280);
+  --secondary-300: oklch(0.4 0.13 280);
+  --secondary-400: oklch(0.48 0.15 280);
+  --secondary-500: oklch(0.6 0.16 280); /* Main Royal Indigo (lighter for dark) */
+  --secondary-600: oklch(0.73 0.14 280);
+  --secondary-700: oklch(0.84 0.1 280);
+  --secondary-800: oklch(0.92 0.06 280);
+  --secondary-900: oklch(0.96 0.03 280);
+
+  /* Semantic Colors for Dark Mode */
+  --success: oklch(0.7 0.16 150);
+  --warning: oklch(0.8 0.14 70);
+  --error: oklch(0.65 0.2 25);
+  --info: oklch(0.7 0.14 240);
+
+  /* Neutral Colors for Dark Mode */
+  --background: oklch(0.15 0 0);
+  --foreground: oklch(0.97 0 0);
+  --card: oklch(0.18 0 0);
+  --card-foreground: oklch(0.97 0 0);
+  --popover: oklch(0.18 0 0);
+  --popover-foreground: oklch(0.97 0 0);
+
+  /* Design Tokens for Dark Mode */
+  --primary: var(--primary-500);
+  --primary-foreground: oklch(0.1 0 0);
+  --secondary: var(--secondary-500);
+  --secondary-foreground: oklch(0.1 0 0);
+  --muted: oklch(0.25 0 0);
+  --muted-foreground: oklch(0.65 0 0);
+  --accent: var(--primary-900);
+  --accent-foreground: var(--primary-100);
+  --destructive: var(--error);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.3 0 0);
+  --input: oklch(0.3 0 0);
+  --ring: var(--primary-500);
+
+  /* EPM Semantic Colors for Dark Mode */
+  --positive: var(--success);
+  --negative: var(--error);
+  --budget: oklch(0.7 0.14 240);
+  --forecast: oklch(0.7 0.14 280);
+  --actual: var(--primary-500);
+
+  /* Confidence Level Colors for Dark Mode */
+  --confidence-s: oklch(0.7 0.16 150);
+  --confidence-a: oklch(0.75 0.14 130);
+  --confidence-b: oklch(0.8 0.14 85);
+  --confidence-c: oklch(0.75 0.14 50);
+  --confidence-d: oklch(0.65 0.2 25);
+  --confidence-z: oklch(0.6 0 0);
+
+  /* Scenario Colors for Dark Mode */
+  --scenario-worst: var(--error);
+  --scenario-normal: oklch(0.7 0.14 240);
+  --scenario-best: var(--success);
+
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+    outline-color: var(--ring);
+    outline-width: 2px;
+    outline-offset: 2px;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

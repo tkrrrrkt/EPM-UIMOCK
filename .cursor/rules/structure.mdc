@@ -1,0 +1,90 @@
+# Structure Rules (CCSDD)
+
+You MUST follow this repository structure and boundary rules.
+
+---
+
+## Single Source of Truth (SSoT)
+
+- Feature specs are in:
+  - `.kiro/specs/<context>/<feature>/`
+- Contracts SSoT is in:
+  - `packages/contracts/`
+    - UI ↔ BFF: `packages/contracts/src/bff`
+    - BFF ↔ Domain API: `packages/contracts/src/api`
+
+---
+
+## Mandatory boundaries
+
+- UI MUST call BFF ONLY.
+- UI MUST NOT call Domain API directly.
+- UI MUST import contracts from `packages/contracts/src/bff` ONLY.
+- UI MUST NOT import or reference `packages/contracts/src/api`.
+
+---
+
+## Where to add files
+
+### UI (Next.js)
+
+- Routes:
+  - `apps/web/src/app/...`
+- Feature code:
+  - `apps/web/src/features/<context>/<feature>/...`
+- Shared UI / design system:
+  - `apps/web/src/shared/ui/...`
+- Shared web utilities:
+  - `apps/web/src/shared/...`
+
+---
+
+### v0 outputs (isolation)
+
+- v0 generated output MUST be placed under:
+  - `apps/web/_v0_drop/<context>/<feature>/`
+- v0 output MUST NOT be committed directly into `apps/web/src` without migration.
+
+---
+
+### BFF (NestJS)
+
+- Feature modules MUST be under:
+  - `apps/bff/src/modules/<context>/<feature>/`
+- BFF MUST NOT access DB directly.
+- BFF MUST call Domain API only.
+- BFF MUST normalize errors to:
+  - `packages/contracts/src/bff/errors`
+  - (UI stability depends on this contract)
+
+---
+
+### Domain API (NestJS)
+
+- Feature modules MUST be under:
+  - `apps/api/src/modules/<context>/<feature>/`
+- Repositories MUST:
+  - Require `tenant_id` in method signatures
+  - Apply tenant guard (`tenant_id`) in all queries
+
+---
+
+## HTTP / data access rules (UI)
+
+- Direct `fetch()` calls in UI feature components are prohibited.
+- UI MUST call BFF via a single client adapter:
+  - `apps/web/src/features/<context>/<feature>/api/HttpBffClient.ts`
+- During UI-MOCK phase, UI MUST run using:
+  - `MockBffClient.ts`
+
+---
+
+## Output requirements for any coding task
+
+Whenever you add or change code, you MUST:
+
+- List all files changed or added.
+- Explicitly confirm:
+  - UI does NOT reference `packages/contracts/src/api`.
+  - UI imports contracts from `packages/contracts/src/bff` only.
+  - UI uses the BFF client adapter (no direct Domain API calls).

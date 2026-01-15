@@ -1,0 +1,35 @@
+{
+  "name": "company-master",
+  "context": "master-data",
+  "description": "法人マスタ - EPM SaaSにおける法人（会社）の基本情報・連結階層・通貨設定を管理する機能",
+  "status": "design-completed",
+  "createdAt": "2026-01-04",
+  "updatedAt": "2026-01-04",
+  "entityReference": {
+    "file": ".kiro/specs/entities/01_各種マスタ.md",
+    "section": "1.2 companies（法人マスタ）"
+  },
+  "phases": {
+    "requirements": {
+      "status": "completed",
+      "file": "requirements.md"
+    },
+    "design": {
+      "status": "completed",
+      "file": "design.md"
+    },
+    "designReview": {
+      "status": "completed",
+      "decision": "GO",
+      "file": "design-review.md"
+    },
+    "tasks": {
+      "status": "pending",
+      "file": "tasks.md"
+    },
+    "v0Prompt": {
+      "status": "completed",
+      "file": "v0-prompt.md"
+    }
+  }
+}

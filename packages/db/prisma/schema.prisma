@@ -1,0 +1,16 @@
+// EPM Database Schema
+// CCSDD: Prisma Schema は Domain API の永続化層を定義
+// RLS: tenant_id による行レベルセキュリティを PostgreSQL で実装
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// Models will be added here as features are implemented
+// =============================================================================

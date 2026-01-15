@@ -1,0 +1,24 @@
+{
+  "feature_name": "planning/budget-entry",
+  "context": "planning",
+  "description": "予算入力画面 - Excel風グリッドで月次×科目の予算を入力",
+  "status": "tasks",
+  "language": "ja",
+  "createdAt": "2026-01-08",
+  "updatedAt": "2026-01-08",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": false
+    }
+  }
+}

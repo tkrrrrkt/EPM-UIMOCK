@@ -1,0 +1,23 @@
+{
+  "feature_name": "forecast-wnb",
+  "created_at": "2026-01-12T12:00:00.000Z",
+  "updated_at": "2026-01-12T12:00:00.000Z",
+  "language": "ja",
+  "phase": "design-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": false,
+      "approved": false
+    }
+  },
+  "ready_for_implementation": true,
+  "notes": "リバースエンジニアリングによりUI実装から作成"
+}
