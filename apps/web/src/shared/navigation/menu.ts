@@ -42,6 +42,10 @@ import {
   Activity,
   UserCog,
   Shield,
+  ClipboardCheck,
+  Briefcase,
+  ArrowRightLeft,
+  FileUp,
   type LucideIcon,
 } from "lucide-react"
 
@@ -221,6 +225,13 @@ export const menu: MenuItem[] = [
         path: "/transactions/actual-entry",
         icon: CheckCircle2,
       },
+      {
+        id: "approval-workflow",
+        label: "Approval Workflow",
+        labelJa: "承認ワークフロー",
+        path: "/workflow/approval",
+        icon: ClipboardCheck,
+      },
     ],
   },
 
@@ -310,6 +321,30 @@ export const menu: MenuItem[] = [
         labelJa: "シナリオ分析レポート",
         path: "/report/scenario-report",
         icon: Activity,
+      },
+      {
+        id: "project-profitability",
+        label: "Project Profitability",
+        labelJa: "PJ採算照会",
+        path: "/report/project-profitability",
+        icon: Briefcase,
+      },
+    ],
+  },
+
+  // データ連携
+  {
+    id: "data-integration",
+    label: "Data Integration",
+    labelJa: "データ連携",
+    icon: ArrowRightLeft,
+    children: [
+      {
+        id: "data-import",
+        label: "Data Import",
+        labelJa: "データ取込",
+        path: "/data-integration/import",
+        icon: FileUp,
       },
     ],
   },

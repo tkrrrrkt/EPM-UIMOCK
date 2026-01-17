@@ -1,0 +1,522 @@
+"use client"
+
+import * as React from "react"
+import dynamic from "next/dynamic"
+import {
+  ArrowLeft,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  Loader2,
+  GitCompare,
+  PlayCircle,
+  RotateCcw,
+} from "lucide-react"
+
+import { Button } from "@/shared/ui/components/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/components/card"
+import { Badge } from "@/shared/ui/components/badge"
+import { Separator } from "@/shared/ui/components/separator"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/shared/ui/components/alert-dialog"
+
+import type { BffClient } from "../api/BffClient"
+import type {
+  ImportType,
+  BffStagingRow,
+  BffStagingColumn,
+} from "@epm/contracts/bff/data-import"
+import { getErrorMessage } from "../error-messages"
+
+interface StagingSummary {
+  totalRows: number
+  includedRows: number
+  excludedRows: number
+  validRows?: number
+  errorRows?: number
+  warningRows?: number
+}
+
+// SpreadJSはSSR非対応なのでdynamic import
+const StagingGrid = dynamic(
+  () => import("./StagingGrid").then(mod => ({ default: mod.StagingGrid })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-96 bg-muted/30 rounded-md">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    ),
+  }
+)
+
+interface StagingSectionProps {
+  bffClient: BffClient
+  batchId: string
+  importType: ImportType
+  eventName: string
+  versionName: string
+  onBack: () => void
+  onComplete: () => void
+}
+
+interface StagingState {
+  columns: BffStagingColumn[]
+  rows: BffStagingRow[]
+  summary: StagingSummary | null
+  isLoading: boolean
+  isValidating: boolean
+  isExecuting: boolean
+  error: string | null
+  validationResult: "VALID" | "INVALID" | null
+  showExecuteDialog: boolean
+  executeResult: {
+    status: "COMPLETED" | "FAILED"
+    importedRows: number
+    excludedRows: number
+    message: string
+  } | null
+}
+
+const initialState: StagingState = {
+  columns: [],
+  rows: [],
+  summary: null,
+  isLoading: true,
+  isValidating: false,
+  isExecuting: false,
+  error: null,
+  validationResult: null,
+  showExecuteDialog: false,
+  executeResult: null,
+}
+
+export function StagingSection({
+  bffClient,
+  batchId,
+  importType,
+  eventName,
+  versionName,
+  onBack,
+  onComplete,
+}: StagingSectionProps) {
+  const [state, setState] = React.useState<StagingState>(initialState)
+
+  // ステージングデータの取得
+  React.useEffect(() => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }))
+    bffClient
+      .getStaging({ batchId })
+      .then(res => {
+        setState(prev => ({
+          ...prev,
+          columns: res.columns,
+          rows: res.rows,
+          summary: res.summary,
+          isLoading: false,
+        }))
+      })
+      .catch(err => {
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+          error: getErrorMessage(err),
+        }))
+      })
+  }, [bffClient, batchId])
+
+  // 行の除外状態変更
+  const handleRowExcludedChange = React.useCallback(async (rowIndex: number, excluded: boolean) => {
+    // ローカル状態を即座に更新
+    setState(prev => ({
+      ...prev,
+      rows: prev.rows.map((row, idx) =>
+        idx === rowIndex ? { ...row, excluded } : row
+      ),
+      summary: prev.summary ? {
+        ...prev.summary,
+        includedRows: prev.summary.includedRows + (excluded ? -1 : 1),
+        excludedRows: prev.summary.excludedRows + (excluded ? 1 : -1),
+      } : null,
+      validationResult: null, // 変更があったら検証結果をリセット
+    }))
+
+    // サーバーに同期
+    try {
+      await bffClient.updateStaging({
+        batchId,
+        updates: [{ rowIndex, excluded }],
+      })
+    } catch (err) {
+      console.error("Failed to update staging:", err)
+    }
+  }, [bffClient, batchId])
+
+  // セル値変更
+  const handleCellChange = React.useCallback(async (
+    rowIndex: number,
+    columnKey: string,
+    value: string | null
+  ) => {
+    // ローカル状態を即座に更新
+    setState(prev => ({
+      ...prev,
+      rows: prev.rows.map((row, idx) =>
+        idx === rowIndex
+          ? { ...row, cells: { ...row.cells, [columnKey]: value } }
+          : row
+      ),
+      validationResult: null, // 変更があったら検証結果をリセット
+    }))
+
+    // サーバーに同期
+    try {
+      await bffClient.updateStaging({
+        batchId,
+        updates: [{ rowIndex, cells: { [columnKey]: value } }],
+      })
+    } catch (err) {
+      console.error("Failed to update staging:", err)
+    }
+  }, [bffClient, batchId])
+
+  // 検証実行
+  const handleValidate = async () => {
+    console.log("[handleValidate] Start validation for batchId:", batchId)
+    setState(prev => ({ ...prev, isValidating: true, error: null }))
+    try {
+      console.log("[handleValidate] Calling bffClient.validate...")
+      const result = await bffClient.validate({ batchId })
+      console.log("[handleValidate] Validation result:", result)
+      setState(prev => ({
+        ...prev,
+        isValidating: false,
+        validationResult: result.status === "VALID" ? "VALID" : "INVALID",
+        rows: prev.rows.map(row => {
+          const error = result.errors.find(e => e.rowIndex === row.rowIndex)
+          if (error) {
+            return { ...row, validationStatus: "ERROR" as const }
+          }
+          return { ...row, validationStatus: "OK" as const }
+        }),
+        summary: prev.summary ? {
+          ...prev.summary,
+          validRows: result.summary.validRows,
+          errorRows: result.summary.errorRows,
+          warningRows: result.summary.warningRows,
+        } : null,
+      }))
+    } catch (err) {
+      setState(prev => ({
+        ...prev,
+        isValidating: false,
+        error: getErrorMessage(err),
+      }))
+    }
+  }
+
+  // 取込実行
+  const handleExecute = async () => {
+    setState(prev => ({ ...prev, isExecuting: true, showExecuteDialog: false, error: null }))
+    try {
+      const result = await bffClient.execute({ batchId, overwrite: true })
+      setState(prev => ({
+        ...prev,
+        isExecuting: false,
+        executeResult: {
+          status: result.status,
+          importedRows: result.importedRows,
+          excludedRows: result.excludedRows,
+          message: result.message ?? "取込が完了しました",
+        },
+      }))
+    } catch (err) {
+      setState(prev => ({
+        ...prev,
+        isExecuting: false,
+        error: getErrorMessage(err),
+      }))
+    }
+  }
+
+  // 全除外の復元
+  const handleRestoreAll = async () => {
+    const excludedRows = state.rows
+      .map((row, idx) => (row.excluded ? idx : -1))
+      .filter(idx => idx >= 0)
+
+    if (excludedRows.length === 0) return
+
+    // ローカル状態を更新
+    setState(prev => ({
+      ...prev,
+      rows: prev.rows.map(row => ({ ...row, excluded: false })),
+      summary: prev.summary ? {
+        ...prev.summary,
+        includedRows: prev.summary.totalRows,
+        excludedRows: 0,
+      } : null,
+      validationResult: null,
+    }))
+
+    // サーバーに同期
+    try {
+      await bffClient.updateStaging({
+        batchId,
+        updates: excludedRows.map(rowIndex => ({ rowIndex, excluded: false })),
+      })
+    } catch (err) {
+      console.error("Failed to restore all rows:", err)
+    }
+  }
+
+  const getImportTypeLabel = (type: ImportType) => {
+    switch (type) {
+      case "BUDGET": return "予算"
+      case "FORECAST": return "見込"
+      case "ACTUAL": return "実績"
+      default: return type
+    }
+  }
+
+  // 完了結果表示
+  if (state.executeResult) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <Card>
+          <CardHeader className="text-center">
+            {state.executeResult.status === "COMPLETED" ? (
+              <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
+            ) : (
+              <XCircle className="h-16 w-16 text-destructive mx-auto mb-4" />
+            )}
+            <CardTitle>
+              {state.executeResult.status === "COMPLETED"
+                ? "取込が完了しました"
+                : "取込に失敗しました"}
+            </CardTitle>
+            <CardDescription>{state.executeResult.message}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-center">
+              <div className="p-4 bg-muted rounded-lg">
+                <div className="text-2xl font-bold text-green-600">
+                  {state.executeResult.importedRows.toLocaleString()}
+                </div>
+                <div className="text-sm text-muted-foreground">取込件数</div>
+              </div>
+              <div className="p-4 bg-muted rounded-lg">
+                <div className="text-2xl font-bold text-gray-500">
+                  {state.executeResult.excludedRows.toLocaleString()}
+                </div>
+                <div className="text-sm text-muted-foreground">除外件数</div>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="text-sm text-muted-foreground">
+              <p>取込先: {getImportTypeLabel(importType)} / {eventName} / {versionName}</p>
+            </div>
+
+            <div className="flex justify-center gap-4 pt-4">
+              <Button variant="outline" onClick={onBack}>
+                新しい取込を開始
+              </Button>
+              <Button onClick={onComplete}>
+                閉じる
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (state.isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-sm text-muted-foreground">データを読み込み中...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (state.error && !state.rows.length) {
+    return (
+      <div className="max-w-md mx-auto">
+        <Card>
+          <CardContent className="py-8 text-center space-y-4">
+            <XCircle className="h-12 w-12 text-destructive mx-auto" />
+            <p className="text-sm text-destructive">{state.error}</p>
+            <Button variant="outline" onClick={onBack}>
+              戻る
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const excludedCount = state.summary?.excludedRows ?? 0
+  const canExecute = state.validationResult === "VALID"
+
+  return (
+    <div className="flex flex-col h-full space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h2 className="font-semibold">ステージング</h2>
+            <p className="text-sm text-muted-foreground">
+              {getImportTypeLabel(importType)} / {eventName} / {versionName}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {excludedCount > 0 && (
+            <Button variant="ghost" size="sm" onClick={handleRestoreAll}>
+              <RotateCcw className="h-4 w-4 mr-1" />
+              除外を全解除
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Summary Bar */}
+      <div className="flex items-center gap-6 p-3 bg-muted/50 rounded-lg text-sm">
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">総件数:</span>
+          <span className="font-medium">{state.summary?.totalRows.toLocaleString() ?? 0}</span>
+        </div>
+        <Separator orientation="vertical" className="h-4" />
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 text-green-500" />
+          <span className="text-muted-foreground">取込対象:</span>
+          <span className="font-medium text-green-600">
+            {state.summary?.includedRows.toLocaleString() ?? 0}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <XCircle className="h-4 w-4 text-gray-400" />
+          <span className="text-muted-foreground">除外:</span>
+          <span className="font-medium text-gray-500">
+            {excludedCount.toLocaleString()}
+          </span>
+        </div>
+        {state.validationResult && (
+          <>
+            <Separator orientation="vertical" className="h-4" />
+            <div className="flex items-center gap-2">
+              {state.validationResult === "VALID" ? (
+                <Badge variant="default" className="bg-green-500">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  検証OK
+                </Badge>
+              ) : (
+                <Badge variant="destructive">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  エラーあり
+                </Badge>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Error Display */}
+      {state.error && (
+        <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
+          {state.error}
+        </div>
+      )}
+
+      {/* Grid */}
+      <div className="border rounded-lg overflow-hidden" style={{ height: "500px" }}>
+        <StagingGrid
+          columns={state.columns}
+          rows={state.rows}
+          onRowExcludedChange={handleRowExcludedChange}
+          onCellChange={handleCellChange}
+          className="h-full"
+        />
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center justify-between pt-2">
+        <div className="text-xs text-muted-foreground">
+          チェックボックスをOFFにすると、その行は取込対象から除外されます
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={handleValidate}
+            disabled={state.isValidating || state.isExecuting}
+          >
+            {state.isValidating ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <GitCompare className="h-4 w-4 mr-2" />
+            )}
+            検証
+          </Button>
+
+          <Button
+            onClick={() => setState(prev => ({ ...prev, showExecuteDialog: true }))}
+            disabled={!canExecute || state.isExecuting}
+          >
+            {state.isExecuting ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <PlayCircle className="h-4 w-4 mr-2" />
+            )}
+            取込実行
+          </Button>
+        </div>
+      </div>
+
+      {/* Execute Confirmation Dialog */}
+      <AlertDialog
+        open={state.showExecuteDialog}
+        onOpenChange={(open) => setState(prev => ({ ...prev, showExecuteDialog: open }))}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>データを取り込みますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              以下の内容で取込を実行します。
+              <div className="mt-4 p-3 bg-muted rounded-md space-y-1 text-sm">
+                <p>取込先: {getImportTypeLabel(importType)} / {eventName} / {versionName}</p>
+                <p>取込件数: {state.summary?.includedRows.toLocaleString() ?? 0}件</p>
+                {excludedCount > 0 && (
+                  <p className="text-muted-foreground">除外: {excludedCount.toLocaleString()}件</p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>キャンセル</AlertDialogCancel>
+            <AlertDialogAction onClick={handleExecute}>
+              取込実行
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+}

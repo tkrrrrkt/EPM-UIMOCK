@@ -2,10 +2,11 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { ChevronRight, PanelLeftClose, PanelLeft, Bell, HelpCircle, User } from "lucide-react"
+import { usePathname, useRouter } from "next/navigation"
+import { ChevronRight, PanelLeftClose, PanelLeft, HelpCircle, User } from "lucide-react"
 
 import { menu, type MenuItem } from "@/shared/navigation/menu"
+import { HeaderNotificationIcon } from "@/features/workflow/approval/components/HeaderNotificationIcon"
 import { cn } from "@/lib/utils"
 import { Button } from "@/shared/ui/components/button"
 import { ScrollArea } from "@/shared/ui/components/scroll-area"
@@ -51,6 +52,8 @@ function Header({
   sidebarOpen: boolean
   onToggleSidebar: () => void
 }) {
+  const router = useRouter()
+
   return (
     <header className="flex h-14 items-center justify-between border-b border-border bg-card px-4">
       <div className="flex items-center gap-3">
@@ -73,11 +76,9 @@ function Header({
       <div className="flex items-center gap-2">
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <Bell className="h-5 w-5" />
-            </Button>
+            <HeaderNotificationIcon onClick={() => router.push('/workflow/approval')} />
           </TooltipTrigger>
-          <TooltipContent>通知</TooltipContent>
+          <TooltipContent>承認待ち</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ArrowLeft, Loader2, Save, History, GitCompare } from "lucide-react"
+import { ArrowLeft, Loader2, Save, History, GitCompare, Send } from "lucide-react"
 import Link from "next/link"
 import {
   Card,
@@ -414,6 +414,19 @@ export function BudgetEntryPage({ client }: BudgetEntryPageProps) {
                   <Save className="h-3 w-3 mr-1" />
                   編集可能
                 </Badge>
+              )}
+              {/* 提出ボタン: 下書き状態で編集可能な場合のみ表示 */}
+              {gridData.context.planVersionStatus === "DRAFT" && gridData.context.isEditable && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    // TODO: 承認ワークフローへの提出処理
+                    alert("承認申請を提出しました。承認ワークフロー画面で確認できます。")
+                  }}
+                >
+                  <Send className="h-4 w-4 mr-1" />
+                  承認申請
+                </Button>
               )}
             </div>
           )}

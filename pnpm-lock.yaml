@@ -112,6 +112,12 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@18.3.1)
+      '@mescius/spread-sheets':
+        specifier: ^19.0.2
+        version: 19.0.2
+      '@mescius/spread-sheets-react':
+        specifier: ^19.0.2
+        version: 19.0.2
       '@radix-ui/react-accordion':
         specifier: ^1.2.12
         version: 1.2.12(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -699,6 +705,12 @@ packages:
   '@lukeed/csprng@1.1.0':
     resolution: {integrity: sha512-Z7C/xXCiGWsg0KuKsHTKJxbWhpI3Vs5GwLfOean7MGyVFGqdRgBbAjOCh6u4bbjPc/8MJ2pZmK/0DLdCbivLDA==}
     engines: {node: '>=8'}
+
+  '@mescius/spread-sheets-react@19.0.2':
+    resolution: {integrity: sha512-3emNhlafSCiTPhyNP6uCuLP4tFtWW3zuw07Q1s1GQAdUTyr6l7+tvBzToC2c8i3Xjk9sbtjhKmwSjV4HTlaYgw==}
+
+  '@mescius/spread-sheets@19.0.2':
+    resolution: {integrity: sha512-q5ypl6sVItPjztpc4NnE8zLc2SSVMZi1ITneSIIihGYe8tEMFjg4DU21+thd9mS5fZXwwGiWGr0vODJ2OHlTaw==}
 
   '@nestjs/cli@10.4.9':
     resolution: {integrity: sha512-s8qYd97bggqeK7Op3iD49X2MpFtW4LVNLAwXFkfbRxKME6IYT7X0muNTJ2+QfI8hpbNx9isWkrLWIp+g5FOhiA==}
@@ -3829,6 +3841,12 @@ snapshots:
       call-bind: 1.0.8
 
   '@lukeed/csprng@1.1.0': {}
+
+  '@mescius/spread-sheets-react@19.0.2':
+    dependencies:
+      '@mescius/spread-sheets': 19.0.2
+
+  '@mescius/spread-sheets@19.0.2': {}
 
   '@nestjs/cli@10.4.9':
     dependencies:
