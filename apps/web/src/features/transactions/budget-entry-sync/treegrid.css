@@ -1,0 +1,265 @@
+/* TreeGrid Budget Entry Custom Styles */
+
+/* Base TreeGrid styling */
+.e-treegrid {
+  border-radius: 0.5rem;
+  overflow: hidden;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Header styling */
+.e-treegrid .e-headercell {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  color: #475569 !important;
+  padding: 10px 12px !important;
+}
+
+.e-treegrid .e-headercell:hover {
+  background-color: #f1f5f9 !important;
+}
+
+/* Row styling */
+.e-treegrid .e-row {
+  border-color: #e2e8f0 !important;
+}
+
+.e-treegrid .e-row:hover {
+  background-color: #f8fafc !important;
+}
+
+.e-treegrid .e-row.e-altrow {
+  background-color: #fafafa !important;
+}
+
+.e-treegrid .e-row.e-altrow:hover {
+  background-color: #f5f5f5 !important;
+}
+
+/* Cell styling */
+.e-treegrid .e-rowcell {
+  border-color: #e2e8f0 !important;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  color: #1e293b !important;
+}
+
+/* Selected cell/row */
+.e-treegrid .e-rowcell.e-selectionbackground,
+.e-treegrid .e-row.e-selectionbackground {
+  background-color: #dbeafe !important;
+}
+
+.e-treegrid .e-rowcell.e-cellselectionbackground {
+  background-color: #bfdbfe !important;
+  outline: 2px solid #3b82f6 !important;
+  outline-offset: -2px;
+}
+
+/* Editable cell focus */
+.e-treegrid .e-editedbatchcell {
+  background-color: #eff6ff !important;
+  box-shadow: inset 0 0 0 2px #3b82f6 !important;
+}
+
+/* Input in edit mode */
+.e-treegrid .e-input,
+.e-treegrid input.e-field {
+  font-family: ui-monospace, monospace !important;
+  font-size: 13px !important;
+  text-align: right !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
+  border-color: #3b82f6 !important;
+}
+
+.e-treegrid .e-input:focus,
+.e-treegrid input.e-field:focus {
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Expand/Collapse icons */
+.e-treegrid .e-treegridexpand,
+.e-treegrid .e-treegridcollapse {
+  color: #64748b !important;
+  font-size: 14px !important;
+}
+
+.e-treegrid .e-treegridexpand:hover,
+.e-treegrid .e-treegridcollapse:hover {
+  color: #3b82f6 !important;
+}
+
+/* Frozen column border */
+.e-treegrid .e-frozencontent {
+  border-right: 2px solid #cbd5e1 !important;
+}
+
+.e-treegrid .e-frozenheader {
+  border-right: 2px solid #cbd5e1 !important;
+}
+
+/* Aggregate row styling */
+.e-treegrid .e-aggregate-row {
+  background-color: #f1f5f9 !important;
+  font-weight: 600 !important;
+}
+
+.e-treegrid .e-aggregate-row:hover {
+  background-color: #e2e8f0 !important;
+}
+
+/* Grid lines */
+.e-treegrid .e-gridlines {
+  border-color: #e2e8f0 !important;
+}
+
+/* Resize handler */
+.e-treegrid .e-rhandler {
+  border-color: #cbd5e1 !important;
+}
+
+/* Context menu */
+.e-treegrid .e-contextmenu-wrapper {
+  border-radius: 8px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Clipboard paste highlight */
+.e-treegrid .e-addedrow {
+  background-color: #dcfce7 !important;
+}
+
+/* Loading indicator */
+.e-treegrid .e-spin-show {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Scrollbar styling */
+.e-treegrid .e-content::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.e-treegrid .e-content::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.e-treegrid .e-content::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.e-treegrid .e-content::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Period type column backgrounds */
+.e-treegrid [data-period-type="QUARTER"] {
+  background-color: #f0f9ff !important;
+}
+
+.e-treegrid [data-period-type="HALF"] {
+  background-color: #dbeafe !important;
+}
+
+.e-treegrid [data-period-type="ANNUAL"] {
+  background-color: #fef3c7 !important;
+}
+
+/* Non-editable cells */
+.e-treegrid .e-non-editable {
+  background-color: #f8fafc !important;
+  color: #64748b !important;
+  cursor: not-allowed;
+}
+
+/* Error state */
+.e-treegrid .e-cell-error {
+  background-color: #fef2f2 !important;
+  border-color: #ef4444 !important;
+}
+
+/* Saved state */
+.e-treegrid .e-cell-saved {
+  background-color: #f0fdf4 !important;
+  transition: background-color 0.3s ease;
+}
+
+/* Tooltip */
+.e-treegrid .e-tooltip-wrap {
+  border-radius: 6px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* ============================================ */
+/* Month Status Backgrounds (for forecast/actual) */
+/* ============================================ */
+
+/* ACTUAL status (forecast) - Gray background for actual months */
+.treegrid-actual-bg {
+  background-color: #e5e7eb !important;
+}
+
+/* CLOSING status (forecast) - Yellow background for closing months */
+.treegrid-closing-bg {
+  background-color: #fef9c3 !important;
+}
+
+/* HARD_CLOSED status (actual) - Dark gray for hard closed months */
+.treegrid-hardclosed-bg {
+  background-color: #d1d5db !important;
+}
+
+/* SOFT_CLOSED status (actual) - Yellow for soft closed months */
+.treegrid-softclosed-bg {
+  background-color: #fef08a !important;
+}
+
+/* FUTURE status (actual) - Light gray for future months */
+.treegrid-future-bg {
+  background-color: #f3f4f6 !important;
+}
+
+/* Quarter column background */
+.treegrid-quarter-bg {
+  background-color: #f0f9ff !important;
+}
+
+/* Half column background */
+.treegrid-half-bg {
+  background-color: #dbeafe !important;
+}
+
+/* Annual column background */
+.treegrid-annual-bg {
+  background-color: #fef3c7 !important;
+}
+
+/* ============================================ */
+/* Row Type Styling (for actual-entry) */
+/* ============================================ */
+
+/* Aggregate row styling */
+.treegrid-aggregate-row {
+  background-color: #f1f5f9 !important;
+  font-weight: 600 !important;
+}
+
+/* Breakdown row styling */
+.treegrid-breakdown-row {
+  font-size: 12px !important;
+}
+
+/* INPUT row (ERP imported values) */
+.treegrid-input-row {
+  background-color: rgba(248, 250, 252, 0.5) !important;
+  color: #64748b !important;
+}
+
+/* ADJUST row (adjustment values) */
+.treegrid-adjust-row {
+  background-color: rgba(254, 243, 199, 0.3) !important;
+}
