@@ -104,8 +104,11 @@ function scanFile(fileAbs: string): Violation[] {
     // UI must not call Domain API directly
     if (isWebSrc) {
       // Prefer catching URL-like usage patterns (reduces false positives)
+      // Allow /api/bff/ since that's the BFF endpoint
       const urlLikeApi =
-        /(fetch|axios\.|ky\.|got\.|request\(|new\s+URL\()/.test(line) && /['"`]\/api\//.test(line);
+        /(fetch|axios\.|ky\.|got\.|request\(|new\s+URL\()/.test(line) &&
+        /['"`]\/api\//.test(line) &&
+        !/['"`]\/api\/bff\//.test(line);
       const importAppsApi =
         /^\s*import\s+.*from\s+['"`].*apps\/api/.test(line) || /from\s+['"`].*apps\/api/.test(line);
 
@@ -114,9 +117,9 @@ function scanFile(fileAbs: string): Violation[] {
       }
     }
 
-    // UI must not use fetch directly (except HttpBffClient.ts)
+    // UI must not use fetch directly (except HttpBffClient.ts / http-bff-client.ts)
     if (isWebSrc) {
-      const allowed = r.endsWith("/api/HttpBffClient.ts");
+      const allowed = r.endsWith("/api/HttpBffClient.ts") || r.endsWith("/api/http-bff-client.ts");
       if (line.includes("fetch(") && !allowed) {
         push("UI_NO_DIRECT_FETCH", i, "Direct fetch() is prohibited in UI. Use HttpBffClient only.");
       }
