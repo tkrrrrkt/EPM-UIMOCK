@@ -191,6 +191,13 @@ export const menu: MenuItem[] = [
         icon: TrendingUp,
       },
       {
+        id: "mtp-sync",
+        label: "Mid-Term Plan (SyV)",
+        labelJa: "中期経営計画 (SyV)",
+        path: "/planning/mtp-sync",
+        icon: TrendingUp,
+      },
+      {
         id: "guideline",
         label: "Budget Guideline",
         labelJa: "予算ガイドライン",

@@ -57,7 +57,10 @@ export interface BffCreatePlanRequest {
   planCode: string
   planName: string
   description?: string
-  subjectId: string
+  /** 財務科目ID（subjectIdとkpiMasterItemIdはどちらか1つが必須、排他的） */
+  subjectId?: string
+  /** KPI項目ID（subjectIdとkpiMasterItemIdはどちらか1つが必須、排他的） */
+  kpiMasterItemId?: string
   ownerDepartmentStableId?: string
   ownerEmployeeId?: string
   startDate?: string
