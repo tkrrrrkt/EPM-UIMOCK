@@ -19,9 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/shared/ui/select';
-import { MockBffClient } from '../../api/mock-bff-client';
+import { HttpBffClient } from '../../api/http-bff-client';
 
-const bffClient = new MockBffClient();
+const bffClient = new HttpBffClient();
 
 interface CreateEventDialogProps {
   open: boolean;

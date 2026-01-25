@@ -21,11 +21,11 @@ import {
   SelectValue,
 } from '@/shared/ui/select';
 import { Plus, Search, CheckCircle2 } from 'lucide-react';
-import { MockBffClient } from '../api/mock-bff-client';
+import { HttpBffClient } from '../api/http-bff-client';
 import { CreateEventDialog } from './dialogs/create-event-dialog';
 import type { KpiMasterEventDto } from '@epm-sdd/contracts/bff/kpi-master';
 
-const bffClient = new MockBffClient();
+const bffClient = new HttpBffClient();
 
 export function KpiEventListPage() {
   const router = useRouter();

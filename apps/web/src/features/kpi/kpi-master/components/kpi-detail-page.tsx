@@ -12,7 +12,7 @@ import {
 } from '@/shared/ui/accordion';
 import { Checkbox } from '@/shared/ui/checkbox';
 import { ArrowLeft, Plus, TrendingUp, Target, BarChart3 } from 'lucide-react';
-import { MockBffClient } from '../api/mock-bff-client';
+import { HttpBffClient } from '../api/http-bff-client';
 import { CreateKpiItemDialog } from './dialogs/create-kpi-item-dialog';
 import { KpiItemPanel } from './kpi-item-panel';
 import type {
@@ -20,7 +20,7 @@ import type {
   KpiMasterItemDetailDto,
 } from '@epm-sdd/contracts/bff/kpi-master';
 
-const bffClient = new MockBffClient();
+const bffClient = new HttpBffClient();
 
 interface KpiDetailPageProps {
   eventId: string;

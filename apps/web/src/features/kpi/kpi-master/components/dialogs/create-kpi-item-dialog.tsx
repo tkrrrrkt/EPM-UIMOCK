@@ -21,9 +21,9 @@ import {
 } from '@/shared/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/shared/ui/radio-group';
 import { TrendingUp, Target, BarChart3 } from 'lucide-react';
-import { MockBffClient } from '../../api/mock-bff-client';
+import { HttpBffClient } from '../../api/http-bff-client';
 
-const bffClient = new MockBffClient();
+const bffClient = new HttpBffClient();
 
 interface CreateKpiItemDialogProps {
   open: boolean;

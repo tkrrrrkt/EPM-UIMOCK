@@ -14,14 +14,14 @@ import {
   TableRow,
 } from '@/shared/ui/table';
 import { Plus, ExternalLink, Edit2, Check, X } from 'lucide-react';
-import { MockBffClient } from '../api/mock-bff-client';
+import { HttpBffClient } from '../api/http-bff-client';
 import { AddActionPlanDialog } from './dialogs/add-action-plan-dialog';
 import type {
   KpiMasterItemDetailDto,
   PeriodFactDto,
 } from '@epm-sdd/contracts/bff/kpi-master';
 
-const bffClient = new MockBffClient();
+const bffClient = new HttpBffClient();
 
 interface KpiItemPanelProps {
   item: KpiMasterItemDetailDto;
