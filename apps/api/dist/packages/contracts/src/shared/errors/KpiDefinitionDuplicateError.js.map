@@ -1,0 +1,1 @@
+{"version":3,"file":"KpiDefinitionDuplicateError.js","sourceRoot":"","sources":["../../../../../../../../packages/contracts/src/shared/errors/KpiDefinitionDuplicateError.ts"],"names":[],"mappings":";;;AAGA,MAAa,2BAA4B,SAAQ,KAAK;IACpD,YAAY,UAAkB,sDAAsD;QAClF,KAAK,CAAC,OAAO,CAAC,CAAC;QACf,IAAI,CAAC,IAAI,GAAG,6BAA6B,CAAC;IAC5C,CAAC;CACF;AALD,kEAKC"}

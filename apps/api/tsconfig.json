@@ -19,6 +19,7 @@
     "noFallthroughCasesInSwitch": true,
     "paths": {
       "@epm/contracts/*": ["../../packages/contracts/src/*"],
+      "@epm-sdd/contracts/*": ["../../packages/contracts/src/*"],
       "@epm/db": ["../../packages/db/src"]
     }
   },

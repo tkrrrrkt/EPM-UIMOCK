@@ -21,7 +21,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@contracts/*": ["../../packages/contracts/src/*"],
-      "@epm/contracts/*": ["../../packages/contracts/src/*"]
+      "@epm/contracts/*": ["../../packages/contracts/src/*"],
+      "@epm-sdd/contracts/*": ["../../packages/contracts/src/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

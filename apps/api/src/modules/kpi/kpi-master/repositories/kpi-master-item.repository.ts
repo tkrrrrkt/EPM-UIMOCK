@@ -47,8 +47,8 @@ export class KpiMasterItemRepository {
     };
 
     // Apply filters
-    if (filters.kpiEventId) {
-      where.kpi_event_id = filters.kpiEventId;
+    if (filters.eventId) {
+      where.kpi_event_id = filters.eventId;
     }
 
     if (filters.parentKpiItemId !== undefined) {

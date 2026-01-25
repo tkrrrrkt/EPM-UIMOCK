@@ -17,6 +17,7 @@ export * from './UpdateKpiMasterItemDto';
 export * from './KpiMasterItemDto';
 export * from './KpiMasterItemDetailDto';
 export * from './KpiMasterItemTreeDto';
+export * from './KpiMasterItemListDto';
 export * from './GetKpiMasterItemsQueryDto';
 
 // 選択肢
