@@ -8,6 +8,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.KpiMasterModule = void 0;
 const common_1 = require("@nestjs/common");
+const axios_1 = require("@nestjs/axios");
 const kpi_master_controller_1 = require("./kpi-master.controller");
 const kpi_master_service_1 = require("./kpi-master.service");
 let KpiMasterModule = class KpiMasterModule {
@@ -15,7 +16,7 @@ let KpiMasterModule = class KpiMasterModule {
 exports.KpiMasterModule = KpiMasterModule;
 exports.KpiMasterModule = KpiMasterModule = __decorate([
     (0, common_1.Module)({
-        imports: [],
+        imports: [axios_1.HttpModule],
         controllers: [kpi_master_controller_1.KpiMasterBffController],
         providers: [kpi_master_service_1.KpiMasterBffService],
         exports: [kpi_master_service_1.KpiMasterBffService],

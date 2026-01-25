@@ -1,4 +1,4 @@
-import { HttpService } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
 import { GetKpiMasterEventsQueryDto, KpiMasterEventDto, KpiMasterEventListDto, GetKpiMasterItemsQueryDto, KpiMasterItemDto, KpiMasterItemDetailDto, KpiMasterItemListDto, CreateKpiMasterEventDto, CreateKpiMasterItemDto, UpdateKpiMasterItemDto } from '@epm-sdd/contracts/bff/kpi-master';
 export declare class KpiMasterBffService {
     private readonly httpService;

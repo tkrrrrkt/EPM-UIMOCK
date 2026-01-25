@@ -8,10 +8,10 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.KpiMasterBffService = void 0;
 const common_1 = require("@nestjs/common");
+const axios_1 = require("@nestjs/axios");
 const rxjs_1 = require("rxjs");
 const kpi_master_mapper_1 = require("./mappers/kpi-master.mapper");
 let KpiMasterBffService = class KpiMasterBffService {
@@ -84,7 +84,7 @@ let KpiMasterBffService = class KpiMasterBffService {
         const apiQuery = {
             offset: normalized.offset,
             limit: normalized.limit,
-            kpiEventId: query.kpiEventId,
+            eventId: query.eventId,
             parentKpiItemId: query.parentKpiItemId,
             kpiType: query.kpiType,
             hierarchyLevel: query.hierarchyLevel,
@@ -193,6 +193,6 @@ let KpiMasterBffService = class KpiMasterBffService {
 exports.KpiMasterBffService = KpiMasterBffService;
 exports.KpiMasterBffService = KpiMasterBffService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [typeof (_a = typeof common_1.HttpService !== "undefined" && common_1.HttpService) === "function" ? _a : Object])
+    __metadata("design:paramtypes", [axios_1.HttpService])
 ], KpiMasterBffService);
 //# sourceMappingURL=kpi-master.service.js.map

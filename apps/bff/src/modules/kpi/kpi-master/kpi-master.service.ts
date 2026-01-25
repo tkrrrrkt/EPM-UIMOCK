@@ -1,4 +1,5 @@
-import { Injectable, HttpService } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
 import { AxiosResponse } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import {
@@ -100,7 +101,7 @@ export class KpiMasterBffService {
     }>('GET', '/kpi-master/events', tenantId, { params: apiQuery });
 
     // Map to BFF DTO
-    const events = response.data.data.map((event) =>
+    const events = response.data.data.map((event: KpiMasterEventApiDto) =>
       KpiMasterMapper.toKpiMasterEventDto(event),
     );
 
@@ -214,7 +215,7 @@ export class KpiMasterBffService {
     const apiQuery: GetKpiMasterItemsApiQueryDto = {
       offset: normalized.offset,
       limit: normalized.limit,
-      kpiEventId: query.kpiEventId,
+      eventId: query.eventId,
       parentKpiItemId: query.parentKpiItemId,
       kpiType: query.kpiType,
       hierarchyLevel: query.hierarchyLevel,
@@ -230,7 +231,7 @@ export class KpiMasterBffService {
     }>('GET', '/kpi-master/items', tenantId, { params: apiQuery });
 
     // Map to BFF DTO (basic list, no detail data)
-    const items = response.data.data.map((item) => KpiMasterMapper.toKpiMasterItemDto(item));
+    const items = response.data.data.map((item: KpiMasterItemApiDto) => KpiMasterMapper.toKpiMasterItemDto(item));
 
     return {
       items,
