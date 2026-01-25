@@ -12,5 +12,247 @@ datasource db {
 }
 
 // =============================================================================
-// Models will be added here as features are implemented
+// Core Models (Multi-tenant Base)
 // =============================================================================
+
+model companies {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenant_id    String   @db.Uuid
+  company_code String   @db.VarChar(50)
+  company_name String   @db.VarChar(200)
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @updatedAt @db.Timestamptz(6)
+
+  // Relations
+  kpi_master_events kpi_master_events[]
+  kpi_definitions   kpi_definitions[]
+  kpi_fact_amounts  kpi_fact_amounts[]
+
+  @@unique([tenant_id, id], name: "companies_tenant_id_uk")
+  @@unique([tenant_id, company_code])
+  @@index([tenant_id])
+  @@map("companies")
+}
+
+model employees {
+  id                            String   @id @default(uuid()) @db.Uuid
+  tenant_id                     String   @db.Uuid
+  employee_code                 String   @db.VarChar(50)
+  employee_name                 String   @db.VarChar(200)
+  control_department_stable_ids String[] @db.VarChar(50)
+  is_active                     Boolean  @default(true)
+  created_at                    DateTime @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime @updatedAt @db.Timestamptz(6)
+
+  // Relations
+  kpi_master_items kpi_master_items[]
+
+  @@unique([tenant_id, id])
+  @@unique([tenant_id, employee_code])
+  @@index([tenant_id])
+  @@map("employees")
+}
+
+model subjects {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenant_id    String   @db.Uuid
+  subject_code String   @db.VarChar(50)
+  subject_name String   @db.VarChar(200)
+  kpi_managed  Boolean  @default(false)
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @updatedAt @db.Timestamptz(6)
+
+  // Relations
+  kpi_master_items kpi_master_items[]
+
+  @@unique([tenant_id, id])
+  @@unique([tenant_id, subject_code])
+  @@index([tenant_id])
+  @@map("subjects")
+}
+
+model metrics {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenant_id   String   @db.Uuid
+  metric_code String   @db.VarChar(50)
+  metric_name String   @db.VarChar(200)
+  kpi_managed Boolean  @default(false)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @updatedAt @db.Timestamptz(6)
+
+  // Relations
+  kpi_master_items kpi_master_items[]
+
+  @@unique([tenant_id, id])
+  @@unique([tenant_id, metric_code])
+  @@index([tenant_id])
+  @@map("metrics")
+}
+
+// =============================================================================
+// KPI Management Master Models
+// =============================================================================
+
+model kpi_master_events {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenant_id   String   @db.Uuid
+  company_id  String   @db.Uuid
+  event_code  String   @db.VarChar(50)
+  event_name  String   @db.VarChar(200)
+  fiscal_year Int
+  status      String   @db.VarChar(20)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @updatedAt @db.Timestamptz(6)
+  created_by  String?  @db.Uuid
+  updated_by  String?  @db.Uuid
+
+  // Relations
+  companies        companies          @relation(fields: [tenant_id, company_id], references: [tenant_id, id])
+  kpi_master_items kpi_master_items[]
+  kpi_fact_amounts kpi_fact_amounts[]
+
+  @@unique([tenant_id, id], name: "kpi_master_events_tenant_id_uk")
+  @@unique([tenant_id, company_id, event_code], name: "kpi_master_events_tenant_code_uk")
+  @@index([tenant_id, company_id])
+  @@index([tenant_id, fiscal_year])
+  @@map("kpi_master_events")
+}
+
+model kpi_master_items {
+  id                    String   @id @default(uuid()) @db.Uuid
+  tenant_id             String   @db.Uuid
+  kpi_event_id          String   @db.Uuid
+  parent_kpi_item_id    String?  @db.Uuid
+  kpi_code              String   @db.VarChar(50)
+  kpi_name              String   @db.VarChar(200)
+  kpi_type              String   @db.VarChar(20)
+  hierarchy_level       Int
+  ref_subject_id        String?  @db.Uuid
+  ref_kpi_definition_id String?  @db.Uuid
+  ref_metric_id         String?  @db.Uuid
+  department_stable_id  String?  @db.VarChar(50)
+  owner_employee_id     String?  @db.Uuid
+  sort_order            Int      @default(1)
+  is_active             Boolean  @default(true)
+  created_at            DateTime @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime @updatedAt @db.Timestamptz(6)
+
+  // Relations
+  kpi_master_events kpi_master_events   @relation(fields: [tenant_id, kpi_event_id], references: [tenant_id, id])
+  parent_kpi_item   kpi_master_items?   @relation("KpiItemHierarchy", fields: [tenant_id, parent_kpi_item_id], references: [tenant_id, id], onDelete: NoAction, onUpdate: NoAction)
+  children          kpi_master_items[]  @relation("KpiItemHierarchy")
+  subjects          subjects?           @relation(fields: [tenant_id, ref_subject_id], references: [tenant_id, id])
+  kpi_definitions   kpi_definitions?    @relation(fields: [tenant_id, ref_kpi_definition_id], references: [tenant_id, id])
+  metrics           metrics?            @relation(fields: [tenant_id, ref_metric_id], references: [tenant_id, id])
+  employees         employees?          @relation(fields: [tenant_id, owner_employee_id], references: [tenant_id, id])
+  kpi_target_values kpi_target_values[]
+  action_plans      action_plans[]
+
+  @@unique([tenant_id, id], name: "kpi_master_items_tenant_id_uk")
+  @@unique([tenant_id, kpi_event_id, kpi_code], name: "kpi_master_items_event_code_uk")
+  @@index([tenant_id, kpi_event_id])
+  @@index([tenant_id, parent_kpi_item_id])
+  @@index([tenant_id, department_stable_id])
+  @@map("kpi_master_items")
+}
+
+model kpi_definitions {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenant_id          String   @db.Uuid
+  company_id         String   @db.Uuid
+  kpi_code           String   @db.VarChar(50)
+  kpi_name           String   @db.VarChar(200)
+  description        String?  @db.Text
+  unit               String?  @db.VarChar(30)
+  aggregation_method String   @db.VarChar(20)
+  direction          String?  @db.VarChar(20)
+  is_active          Boolean  @default(true)
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime @updatedAt @db.Timestamptz(6)
+  created_by         String?  @db.Uuid
+  updated_by         String?  @db.Uuid
+
+  // Relations
+  companies        companies          @relation(fields: [tenant_id, company_id], references: [tenant_id, id])
+  kpi_master_items kpi_master_items[]
+  kpi_fact_amounts kpi_fact_amounts[]
+
+  @@unique([tenant_id, id], name: "kpi_definitions_tenant_id_uk")
+  @@unique([tenant_id, company_id, kpi_code], name: "kpi_definitions_company_code_uk")
+  @@index([tenant_id, company_id])
+  @@map("kpi_definitions")
+}
+
+model kpi_fact_amounts {
+  id                   String    @id @default(uuid()) @db.Uuid
+  tenant_id            String    @db.Uuid
+  company_id           String    @db.Uuid
+  kpi_event_id         String    @db.Uuid
+  kpi_definition_id    String    @db.Uuid
+  period_code          String    @db.VarChar(32)
+  period_start_date    DateTime? @db.Date
+  period_end_date      DateTime? @db.Date
+  target_value         Decimal?  @db.Decimal
+  actual_value         Decimal?  @db.Decimal
+  department_stable_id String?   @db.VarChar(50)
+  notes                String?   @db.Text
+  created_at           DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime  @updatedAt @db.Timestamptz(6)
+  created_by           String?   @db.Uuid
+  updated_by           String?   @db.Uuid
+
+  // Relations
+  companies         companies         @relation(fields: [tenant_id, company_id], references: [tenant_id, id])
+  kpi_master_events kpi_master_events @relation(fields: [tenant_id, kpi_event_id], references: [tenant_id, id])
+  kpi_definitions   kpi_definitions   @relation(fields: [tenant_id, kpi_definition_id], references: [tenant_id, id])
+
+  @@unique([tenant_id, kpi_event_id, kpi_definition_id, period_code, department_stable_id], name: "kpi_fact_amounts_uk")
+  @@index([tenant_id, kpi_event_id, kpi_definition_id])
+  @@index([tenant_id, department_stable_id])
+  @@map("kpi_fact_amounts")
+}
+
+model kpi_target_values {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenant_id          String   @db.Uuid
+  kpi_master_item_id String   @db.Uuid
+  period_code        String   @db.VarChar(32)
+  target_value       Decimal  @db.Decimal
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime @updatedAt @db.Timestamptz(6)
+
+  // Relations
+  kpi_master_items kpi_master_items @relation(fields: [tenant_id, kpi_master_item_id], references: [tenant_id, id])
+
+  @@unique([tenant_id, kpi_master_item_id, period_code], name: "kpi_target_values_uk")
+  @@index([tenant_id, kpi_master_item_id])
+  @@map("kpi_target_values")
+}
+
+model action_plans {
+  id                         String    @id @default(uuid()) @db.Uuid
+  tenant_id                  String    @db.Uuid
+  plan_code                  String    @db.VarChar(50)
+  plan_name                  String    @db.VarChar(200)
+  subject_id                 String?   @db.Uuid
+  kpi_master_item_id         String?   @db.Uuid
+  owner_department_stable_id String?   @db.VarChar(50)
+  owner_employee_id          String?   @db.Uuid
+  due_date                   DateTime? @db.Date
+  status                     String    @db.VarChar(20)
+  progress_rate              Int?
+  is_active                  Boolean   @default(true)
+  created_at                 DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime  @updatedAt @db.Timestamptz(6)
+
+  // Relations
+  kpi_master_items kpi_master_items? @relation(fields: [tenant_id, kpi_master_item_id], references: [tenant_id, id])
+
+  @@unique([tenant_id, plan_code])
+  @@index([tenant_id, kpi_master_item_id])
+  @@map("action_plans")
+}
