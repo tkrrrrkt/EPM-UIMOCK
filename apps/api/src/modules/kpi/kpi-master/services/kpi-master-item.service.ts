@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { KpiMasterItemRepository } from '../repositories/kpi-master-item.repository';
 import { KpiMasterEventRepository } from '../repositories/kpi-master-event.repository';
+import { SubjectRepository } from '../repositories/subject.repository';
+import { MetricRepository } from '../repositories/metric.repository';
 import {
   KpiMasterItemApiDto,
   CreateKpiMasterItemApiDto,
@@ -13,7 +15,9 @@ import {
   KpiMasterItemNotFoundError,
   KpiMasterItemAccessDeniedError,
   KpiMasterItemInvalidReferenceError,
-  KpiMasterItemCannotDeleteConfirmedError,
+  KpiMasterItemDeleteForbiddenError,
+  KpiManagedSubjectNotFoundError,
+  KpiManagedMetricNotFoundError,
 } from '@epm-sdd/contracts/shared/errors';
 
 /**
@@ -35,6 +39,8 @@ export class KpiMasterItemService {
   constructor(
     private readonly itemRepository: KpiMasterItemRepository,
     private readonly eventRepository: KpiMasterEventRepository,
+    private readonly subjectRepository: SubjectRepository,
+    private readonly metricRepository: MetricRepository,
   ) {}
 
   /**
@@ -210,7 +216,7 @@ export class KpiMasterItemService {
    * @param id - KPI item ID
    * @param userId - User ID for audit trail
    * @throws KpiMasterItemNotFoundError if item not found
-   * @throws KpiMasterItemCannotDeleteConfirmedError if event is CONFIRMED
+   * @throws KpiMasterItemDeleteForbiddenError if event is CONFIRMED
    */
   async delete(tenantId: string, id: string, userId?: string): Promise<void> {
     // Check if item exists
@@ -222,7 +228,7 @@ export class KpiMasterItemService {
     // Business Rule: Check if event is CONFIRMED
     const event = await this.eventRepository.findById(tenantId, item.kpiEventId);
     if (event && event.status === KpiMasterEventStatus.CONFIRMED) {
-      throw new KpiMasterItemCannotDeleteConfirmedError(
+      throw new KpiMasterItemDeleteForbiddenError(
         `Cannot delete KPI item: event is CONFIRMED (${event.eventCode})`,
       );
     }
@@ -269,11 +275,18 @@ export class KpiMasterItemService {
             'FINANCIAL KPI requires refSubjectId',
           );
         }
-        // TODO: Check if subject.kpi_managed=true
-        // const subject = await this.subjectRepository.findById(tenantId, refs.refSubjectId);
-        // if (!subject || !subject.kpiManaged) {
-        //   throw new KpiMasterItemInvalidReferenceError('Subject not found or kpi_managed=false');
-        // }
+        // Business Rule: Verify subject exists and kpi_managed=true
+        const subject = await this.subjectRepository.findById(tenantId, refs.refSubjectId);
+        if (!subject) {
+          throw new KpiManagedSubjectNotFoundError(
+            `Subject not found: ${refs.refSubjectId}`,
+          );
+        }
+        if (!subject.kpiManaged) {
+          throw new KpiManagedSubjectNotFoundError(
+            `Subject kpi_managed=false: ${subject.subjectCode} (${subject.subjectName})`,
+          );
+        }
         break;
 
       case KpiType.NON_FINANCIAL:
@@ -288,11 +301,18 @@ export class KpiMasterItemService {
         if (!refs.refMetricId) {
           throw new KpiMasterItemInvalidReferenceError('METRIC KPI requires refMetricId');
         }
-        // TODO: Check if metric.kpi_managed=true
-        // const metric = await this.metricRepository.findById(tenantId, refs.refMetricId);
-        // if (!metric || !metric.kpiManaged) {
-        //   throw new KpiMasterItemInvalidReferenceError('Metric not found or kpi_managed=false');
-        // }
+        // Business Rule: Verify metric exists and kpi_managed=true
+        const metric = await this.metricRepository.findById(tenantId, refs.refMetricId);
+        if (!metric) {
+          throw new KpiManagedMetricNotFoundError(
+            `Metric not found: ${refs.refMetricId}`,
+          );
+        }
+        if (!metric.kpiManaged) {
+          throw new KpiManagedMetricNotFoundError(
+            `Metric kpi_managed=false: ${metric.metricCode} (${metric.metricName})`,
+          );
+        }
         break;
 
       default:

@@ -6,7 +6,7 @@ import {
 } from '@epm-sdd/contracts/api/kpi-master';
 import {
   KpiTargetValueNotFoundError,
-  KpiTargetValueDuplicatePeriodError,
+  KpiTargetValueDuplicateError,
 } from '@epm-sdd/contracts/shared/errors';
 
 /**
@@ -51,7 +51,7 @@ export class KpiTargetValueService {
    * @param data - Target value creation data
    * @param userId - User ID for audit trail
    * @returns Created KPI target value
-   * @throws KpiTargetValueDuplicatePeriodError if period already exists
+   * @throws KpiTargetValueDuplicateError if period already exists
    */
   async create(
     tenantId: string,
@@ -67,7 +67,7 @@ export class KpiTargetValueService {
     const duplicate = existing.find((target) => target.periodCode === data.periodCode);
 
     if (duplicate) {
-      throw new KpiTargetValueDuplicatePeriodError(
+      throw new KpiTargetValueDuplicateError(
         `Target value already exists for period: ${data.periodCode}`,
       );
     }

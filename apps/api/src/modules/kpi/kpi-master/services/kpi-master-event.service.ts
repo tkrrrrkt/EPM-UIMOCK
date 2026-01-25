@@ -7,9 +7,9 @@ import {
 } from '@epm-sdd/contracts/api/kpi-master';
 import { KpiMasterEventStatus } from '@epm-sdd/contracts/shared/enums/kpi';
 import {
-  KpiMasterEventAlreadyExistsError,
+  KpiMasterEventDuplicateError,
   KpiMasterEventNotFoundError,
-  KpiMasterEventInvalidStatusTransitionError,
+  KpiMasterEventAlreadyConfirmedError,
 } from '@epm-sdd/contracts/shared/errors';
 
 /**
@@ -72,7 +72,7 @@ export class KpiMasterEventService {
    * @param data - Event creation data
    * @param userId - User ID for audit trail
    * @returns Created KPI event
-   * @throws KpiMasterEventAlreadyExistsError if event_code already exists
+   * @throws KpiMasterEventDuplicateError if event_code already exists
    */
   async create(
     tenantId: string,
@@ -87,7 +87,7 @@ export class KpiMasterEventService {
     );
 
     if (existing) {
-      throw new KpiMasterEventAlreadyExistsError(
+      throw new KpiMasterEventDuplicateError(
         `Event code already exists: ${data.eventCode} in company ${data.companyId}`,
       );
     }
@@ -121,7 +121,7 @@ export class KpiMasterEventService {
    * @param userId - User ID for audit trail
    * @returns Updated KPI event
    * @throws KpiMasterEventNotFoundError if event not found
-   * @throws KpiMasterEventAlreadyExistsError if event_code already exists
+   * @throws KpiMasterEventDuplicateError if event_code already exists
    */
   async update(
     tenantId: string,
@@ -144,7 +144,7 @@ export class KpiMasterEventService {
       );
 
       if (duplicate && duplicate.id !== id) {
-        throw new KpiMasterEventAlreadyExistsError(
+        throw new KpiMasterEventDuplicateError(
           `Event code already exists: ${data.eventCode}`,
         );
       }
@@ -178,7 +178,7 @@ export class KpiMasterEventService {
    * @param userId - User ID for audit trail
    * @returns Confirmed KPI event
    * @throws KpiMasterEventNotFoundError if event not found
-   * @throws KpiMasterEventInvalidStatusTransitionError if not in DRAFT status
+   * @throws KpiMasterEventAlreadyConfirmedError if not in DRAFT status
    */
   async confirm(tenantId: string, id: string, userId?: string): Promise<KpiMasterEventApiDto> {
     // Check if event exists
@@ -189,7 +189,7 @@ export class KpiMasterEventService {
 
     // Business Rule: Only DRAFT events can be confirmed
     if (existing.status !== KpiMasterEventStatus.DRAFT) {
-      throw new KpiMasterEventInvalidStatusTransitionError(
+      throw new KpiMasterEventAlreadyConfirmedError(
         `Cannot confirm event in ${existing.status} status. Only DRAFT events can be confirmed.`,
       );
     }

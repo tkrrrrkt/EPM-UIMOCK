@@ -15,7 +15,7 @@ import {
   Label,
   useToast,
 } from "@/shared/ui"
-import { MockBffClient } from "../../../api/mock-bff-client"
+import { MockBffClient } from "../../api/mock-bff-client"
 import type { BffMtpEventSummary } from "@epm/contracts/bff/mtp"
 
 const bffClient = new MockBffClient()

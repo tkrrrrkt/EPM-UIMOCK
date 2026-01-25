@@ -16,7 +16,7 @@ import {
   Textarea,
   useToast,
 } from "@/shared/ui"
-import { MockBffClient } from "../../../api/mock-bff-client"
+import { MockBffClient } from "../../api/mock-bff-client"
 import type { BffDimensionValueSummary, BffStrategyThemeSummary } from "@epm/contracts/bff/mtp"
 
 const bffClient = new MockBffClient()

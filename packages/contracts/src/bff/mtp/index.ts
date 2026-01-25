@@ -122,6 +122,8 @@ export interface BffSubjectRow {
   subjectName: string
   sortOrder: number
   isAggregate: boolean
+  parentRowId: string | null // ツリー構造用（レイアウトマスタに基づく）
+  indentLevel: number // 階層レベル（0から開始）
 }
 
 export interface BffSaveMtpAmountsRequest {

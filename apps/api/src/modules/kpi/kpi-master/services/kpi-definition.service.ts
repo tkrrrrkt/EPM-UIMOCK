@@ -4,7 +4,7 @@ import {
   KpiDefinitionApiDto,
   CreateKpiDefinitionApiDto,
 } from '@epm-sdd/contracts/api/kpi-master';
-import { KpiDefinitionAlreadyExistsError } from '@epm-sdd/contracts/shared/errors';
+import { KpiDefinitionDuplicateError } from '@epm-sdd/contracts/shared/errors';
 
 /**
  * KpiDefinitionService
@@ -55,7 +55,7 @@ export class KpiDefinitionService {
    * @param data - KPI definition creation data
    * @param userId - User ID for audit trail
    * @returns Created KPI definition
-   * @throws KpiDefinitionAlreadyExistsError if kpi_code already exists
+   * @throws KpiDefinitionDuplicateError if kpi_code already exists
    */
   async create(
     tenantId: string,
@@ -70,7 +70,7 @@ export class KpiDefinitionService {
     );
 
     if (existing) {
-      throw new KpiDefinitionAlreadyExistsError(
+      throw new KpiDefinitionDuplicateError(
         `KPI definition code already exists: ${data.kpiCode} in company ${data.companyId}`,
       );
     }

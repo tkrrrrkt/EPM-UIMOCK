@@ -6,7 +6,7 @@ import {
 } from '@epm-sdd/contracts/api/kpi-master';
 import {
   KpiFactAmountNotFoundError,
-  KpiFactAmountDuplicatePeriodError,
+  KpiFactAmountDuplicateError,
 } from '@epm-sdd/contracts/shared/errors';
 
 /**
@@ -54,7 +54,7 @@ export class KpiFactAmountService {
    * @param data - Fact amount creation data
    * @param userId - User ID for audit trail
    * @returns Created KPI fact amount
-   * @throws KpiFactAmountDuplicatePeriodError if period already exists
+   * @throws KpiFactAmountDuplicateError if period already exists
    */
   async create(
     tenantId: string,
@@ -75,7 +75,7 @@ export class KpiFactAmountService {
     );
 
     if (duplicate) {
-      throw new KpiFactAmountDuplicatePeriodError(
+      throw new KpiFactAmountDuplicateError(
         `Fact amount already exists for period: ${data.periodCode}, department: ${data.departmentStableId || 'company-wide'}`,
       );
     }

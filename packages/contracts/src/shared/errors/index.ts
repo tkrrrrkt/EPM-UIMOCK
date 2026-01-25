@@ -6,6 +6,7 @@
 
 export * from './KpiMasterEventNotFoundError';
 export * from './KpiMasterEventAlreadyConfirmedError';
+export * from './KpiMasterEventDuplicateError';
 export * from './KpiMasterItemNotFoundError';
 export * from './KpiMasterItemTypeImmutableError';
 export * from './KpiMasterItemDeleteForbiddenError';

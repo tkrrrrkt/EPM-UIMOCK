@@ -28,6 +28,7 @@ interface GridRow {
   subjectName: string
   isAggregate: boolean
   isExpanded: boolean
+  indentLevel: number
   [key: string]: string | number | boolean | null
 }
 
@@ -47,11 +48,12 @@ export function TreeGridMtpAmountGrid({
     data.subjects.forEach((subject) => {
       const row: GridRow = {
         id: subject.id,
-        parentId: null,
+        parentId: subject.parentRowId, // レイアウトマスタに基づく階層構造
         subjectId: subject.id,
         subjectName: subject.subjectName,
         isAggregate: subject.isAggregate,
         isExpanded: true,
+        indentLevel: subject.indentLevel,
       }
 
       // Add amount columns (actual and plan)
@@ -171,19 +173,36 @@ export function TreeGridMtpAmountGrid({
       const { column, cell, data: rowData } = args
       const field = column.field
 
-      // Aggregate row styling
+      // Aggregate row styling (親行・集計行)
       if (rowData.isAggregate) {
         cell.classList.add("mtp-aggregate-row")
+        cell.style.fontWeight = "600"
+        cell.style.backgroundColor = "#f8fafc"
       }
 
-      // Actual column styling
+      // 子行のスタイリング（indent level > 0）
+      if (rowData.indentLevel > 0 && !rowData.isAggregate) {
+        cell.style.color = "#475569"
+      }
+
+      // Actual column styling (実績列)
       if (field.startsWith("actual_")) {
         cell.classList.add("mtp-actual-cell")
+        cell.style.backgroundColor = rowData.isAggregate ? "#e2e8f0" : "#f1f5f9"
+        cell.style.color = "#64748b"
       }
 
-      // Plan total column styling
+      // Plan total column styling (計画合計列)
       if (field === "planTotal") {
         cell.classList.add("mtp-total-cell")
+        cell.style.backgroundColor = rowData.isAggregate ? "#fef3c7" : "#fefce8"
+        cell.style.fontWeight = "600"
+      }
+
+      // Number alignment for amount columns
+      if (field.startsWith("actual_") || field.startsWith("plan_") || field === "planTotal") {
+        cell.style.textAlign = "right"
+        cell.style.fontFamily = "ui-monospace, monospace"
       }
     },
     []
