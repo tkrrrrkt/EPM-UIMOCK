@@ -1,113 +1,119 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../../prisma/prisma.service';
-import {
-  KpiFactAmountApiDto,
-  CreateKpiFactAmountApiDto,
-} from '@epm-sdd/contracts/api/kpi-master';
-import { Decimal } from '@prisma/client/runtime/library';
-
 /**
- * KpiFactAmountRepository
+ * KPI Fact Amount Repository
  *
- * Purpose:
- * - tenant_id required for all methods
- * - WHERE clause double-guard required (RLS + application level)
+ * @module kpi/kpi-master
+ *
+ * Repository Requirements:
+ * - tenant_id required for all methods (RLS + application level double-guard)
+ * - WHERE clause double-guard required
  * - set_config prerequisite (RLS enabled, no bypass)
  *
- * Repository Principles:
- * - All methods require tenantId as mandatory parameter
- * - All WHERE clauses must include tenant_id (RLS double-guard)
- * - Execute set_config('app.tenant_id', :tenant_id) before queries
+ * Spec: .kiro/specs/kpi/kpi-master/design.md (Repository Specification)
  */
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../../../prisma/prisma.service';
+import type {
+  KpiFactAmountApiDto,
+  CreateKpiFactAmountApiDto,
+  UpdateKpiFactAmountApiDto,
+} from '@epm/contracts/api/kpi-master';
+
 @Injectable()
 export class KpiFactAmountRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Find KPI fact amounts by KPI definition ID and event ID
-   *
-   * @param tenantId - Tenant ID (required)
-   * @param kpiDefinitionId - KPI definition ID
-   * @param eventId - KPI event ID
-   * @returns Array of KPI fact amounts
+   * KPI定義×イベント×部門での予実データ取得
    */
   async findByItemId(
     tenantId: string,
     kpiDefinitionId: string,
     eventId: string,
+    departmentStableId?: string,
   ): Promise<KpiFactAmountApiDto[]> {
-    // Set tenant context for RLS
     await this.prisma.setTenantContext(tenantId);
 
-    // Query with tenant_id double-guard
+    const where: any = {
+      tenant_id: tenantId,
+      kpi_definition_id: kpiDefinitionId,
+      kpi_event_id: eventId,
+    };
+
+    if (departmentStableId) {
+      where.department_stable_id = departmentStableId;
+    }
+
     const factAmounts = await this.prisma.kpi_fact_amounts.findMany({
-      where: {
-        tenant_id: tenantId, // Required: tenant_id in WHERE clause
-        kpi_definition_id: kpiDefinitionId,
-        kpi_event_id: eventId,
-      },
-      orderBy: {
-        period_code: 'asc',
-      },
+      where,
+      orderBy: [{ period_start_date: 'asc' }],
     });
 
-    return factAmounts.map((fact) => this.mapToApiDto(fact));
+    return factAmounts.map((fa) => this.mapToApiDto(fa));
   }
 
   /**
-   * Find KPI fact amount by ID
-   *
-   * @param tenantId - Tenant ID (required)
-   * @param id - Fact amount ID
-   * @returns KPI fact amount or null if not found
+   * 期間別予実データ取得（重複チェック用）
    */
-  async findById(tenantId: string, id: string): Promise<KpiFactAmountApiDto | null> {
-    // Set tenant context for RLS
+  async findByPeriod(
+    tenantId: string,
+    eventId: string,
+    kpiDefinitionId: string,
+    periodCode: string,
+    departmentStableId?: string,
+  ): Promise<KpiFactAmountApiDto | null> {
     await this.prisma.setTenantContext(tenantId);
 
-    // Query with tenant_id double-guard
+    const where: any = {
+      tenant_id: tenantId,
+      kpi_event_id: eventId,
+      kpi_definition_id: kpiDefinitionId,
+      period_code: periodCode,
+    };
+
+    if (departmentStableId) {
+      where.department_stable_id = departmentStableId;
+    } else {
+      where.department_stable_id = null;
+    }
+
     const factAmount = await this.prisma.kpi_fact_amounts.findFirst({
-      where: {
-        tenant_id: tenantId, // Required: tenant_id in WHERE clause
-        id,
-      },
+      where,
     });
 
     return factAmount ? this.mapToApiDto(factAmount) : null;
   }
 
   /**
-   * Create new KPI fact amount
-   *
-   * @param tenantId - Tenant ID (required)
-   * @param data - Fact amount creation data
-   * @param userId - User ID for audit trail (optional)
-   * @returns Created KPI fact amount
+   * 予実データ作成
    */
   async create(
     tenantId: string,
-    data: CreateKpiFactAmountApiDto,
-    userId?: string,
+    data: CreateKpiFactAmountApiDto & {
+      company_id: string;
+      created_by?: string;
+    },
   ): Promise<KpiFactAmountApiDto> {
-    // Set tenant context for RLS
     await this.prisma.setTenantContext(tenantId);
 
-    // Create fact amount with tenant_id
     const factAmount = await this.prisma.kpi_fact_amounts.create({
       data: {
-        tenant_id: tenantId, // Required: tenant_id for multi-tenant isolation
-        company_id: data.companyId,
-        kpi_event_id: data.kpiEventId,
-        kpi_definition_id: data.kpiDefinitionId,
-        period_code: data.periodCode,
-        period_start_date: data.periodStartDate ? new Date(data.periodStartDate) : undefined,
-        period_end_date: data.periodEndDate ? new Date(data.periodEndDate) : undefined,
-        target_value: data.targetValue !== undefined ? new Decimal(data.targetValue) : undefined,
-        actual_value: data.actualValue !== undefined ? new Decimal(data.actualValue) : undefined,
-        department_stable_id: data.departmentStableId,
+        tenant_id: tenantId,
+        company_id: data.company_id,
+        kpi_event_id: data.event_id,
+        kpi_definition_id: data.kpi_definition_id,
+        period_code: data.period_code,
+        period_start_date: data.period_start_date
+          ? new Date(data.period_start_date)
+          : null,
+        period_end_date: data.period_end_date
+          ? new Date(data.period_end_date)
+          : null,
+        target_value: data.target_value,
+        actual_value: data.actual_value,
+        department_stable_id: data.department_stable_id,
         notes: data.notes,
-        created_by: userId,
-        updated_by: userId,
+        created_by: data.created_by,
+        updated_by: data.created_by,
       },
     });
 
@@ -115,56 +121,25 @@ export class KpiFactAmountRepository {
   }
 
   /**
-   * Update KPI fact amount
-   *
-   * @param tenantId - Tenant ID (required)
-   * @param id - Fact amount ID
-   * @param data - Fact amount update data
-   * @param userId - User ID for audit trail (optional)
-   * @returns Updated KPI fact amount or null if not found
+   * 予実データ更新
    */
   async update(
     tenantId: string,
     id: string,
-    data: Partial<CreateKpiFactAmountApiDto>,
-    userId?: string,
-  ): Promise<KpiFactAmountApiDto | null> {
-    // Set tenant context for RLS
+    data: UpdateKpiFactAmountApiDto & { updated_by?: string },
+  ): Promise<KpiFactAmountApiDto> {
     await this.prisma.setTenantContext(tenantId);
 
-    // Check if fact amount exists with tenant_id double-guard
-    const existing = await this.prisma.kpi_fact_amounts.findFirst({
+    const factAmount = await this.prisma.kpi_fact_amounts.update({
       where: {
-        tenant_id: tenantId, // Required: tenant_id in WHERE clause
+        tenant_id: tenantId,
         id,
       },
-    });
-
-    if (!existing) {
-      return null;
-    }
-
-    // Update fact amount
-    const factAmount = await this.prisma.kpi_fact_amounts.update({
-      where: { id },
       data: {
-        ...(data.periodStartDate !== undefined && {
-          period_start_date: data.periodStartDate ? new Date(data.periodStartDate) : null,
-        }),
-        ...(data.periodEndDate !== undefined && {
-          period_end_date: data.periodEndDate ? new Date(data.periodEndDate) : null,
-        }),
-        ...(data.targetValue !== undefined && {
-          target_value: data.targetValue !== null ? new Decimal(data.targetValue) : null,
-        }),
-        ...(data.actualValue !== undefined && {
-          actual_value: data.actualValue !== null ? new Decimal(data.actualValue) : null,
-        }),
-        ...(data.departmentStableId !== undefined && {
-          department_stable_id: data.departmentStableId,
-        }),
-        ...(data.notes !== undefined && { notes: data.notes }),
-        updated_by: userId,
+        target_value: data.target_value,
+        actual_value: data.actual_value,
+        notes: data.notes,
+        updated_by: data.updated_by,
       },
     });
 
@@ -172,28 +147,34 @@ export class KpiFactAmountRepository {
   }
 
   /**
-   * Map Prisma model to API DTO
-   *
-   * @param fact - Prisma kpi_fact_amounts model
-   * @returns KpiFactAmountApiDto
+   * Prisma model → API DTO 変換
    */
-  private mapToApiDto(fact: any): KpiFactAmountApiDto {
+  private mapToApiDto(factAmount: any): KpiFactAmountApiDto {
     return {
-      id: fact.id,
-      companyId: fact.company_id,
-      kpiEventId: fact.kpi_event_id,
-      kpiDefinitionId: fact.kpi_definition_id,
-      periodCode: fact.period_code,
-      periodStartDate: fact.period_start_date?.toISOString(),
-      periodEndDate: fact.period_end_date?.toISOString(),
-      targetValue: fact.target_value ? parseFloat(fact.target_value.toString()) : undefined,
-      actualValue: fact.actual_value ? parseFloat(fact.actual_value.toString()) : undefined,
-      departmentStableId: fact.department_stable_id || undefined,
-      notes: fact.notes || undefined,
-      createdAt: fact.created_at.toISOString(),
-      updatedAt: fact.updated_at.toISOString(),
-      createdBy: fact.created_by || undefined,
-      updatedBy: fact.updated_by || undefined,
+      id: factAmount.id,
+      tenant_id: factAmount.tenant_id,
+      company_id: factAmount.company_id,
+      event_id: factAmount.kpi_event_id,
+      kpi_definition_id: factAmount.kpi_definition_id,
+      period_code: factAmount.period_code,
+      period_start_date: factAmount.period_start_date
+        ? factAmount.period_start_date.toISOString().split('T')[0]
+        : undefined,
+      period_end_date: factAmount.period_end_date
+        ? factAmount.period_end_date.toISOString().split('T')[0]
+        : undefined,
+      target_value: factAmount.target_value
+        ? parseFloat(factAmount.target_value.toString())
+        : undefined,
+      actual_value: factAmount.actual_value
+        ? parseFloat(factAmount.actual_value.toString())
+        : undefined,
+      department_stable_id: factAmount.department_stable_id,
+      notes: factAmount.notes,
+      created_at: factAmount.created_at.toISOString(),
+      updated_at: factAmount.updated_at.toISOString(),
+      created_by: factAmount.created_by,
+      updated_by: factAmount.updated_by,
     };
   }
 }

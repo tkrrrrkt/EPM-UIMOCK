@@ -1,114 +1,104 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../../prisma/prisma.service';
-import {
-  KpiMasterEventApiDto,
-  CreateKpiMasterEventApiDto,
-  GetKpiMasterEventsApiQueryDto,
-} from '@epm-sdd/contracts/api/kpi-master';
-import { KpiMasterEventStatus } from '@epm-sdd/contracts/shared/enums/kpi';
-
 /**
- * KpiMasterEventRepository
+ * KPI Master Event Repository
  *
- * Purpose:
- * - tenant_id required for all methods
- * - WHERE clause double-guard required (RLS + application level)
+ * @module kpi/kpi-master
+ *
+ * Repository Requirements:
+ * - tenant_id required for all methods (RLS + application level double-guard)
+ * - WHERE clause double-guard required
  * - set_config prerequisite (RLS enabled, no bypass)
  *
- * Repository Principles:
- * - All methods require tenantId as mandatory parameter
- * - All WHERE clauses must include tenant_id (RLS double-guard)
- * - Execute set_config('app.tenant_id', :tenant_id) before queries
+ * Spec: .kiro/specs/kpi/kpi-master/design.md (Repository Specification)
  */
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../../../prisma/prisma.service';
+import type {
+  KpiMasterEventApiDto,
+  CreateKpiMasterEventApiDto,
+  UpdateKpiMasterEventApiDto,
+  GetKpiMasterEventsApiQueryDto,
+} from '@epm/contracts/api/kpi-master';
+
 @Injectable()
 export class KpiMasterEventRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Find all KPI master events with filters and pagination
-   *
-   * @param tenantId - Tenant ID (required)
-   * @param filters - Query filters (keyword, fiscalYear, status)
-   * @param pagination - Pagination parameters (offset, limit, sortBy, sortOrder)
-   * @returns Array of KPI master events matching filters
+   * KPI管理イベント一覧取得
    */
   async findAll(
     tenantId: string,
-    filters: GetKpiMasterEventsApiQueryDto,
-  ): Promise<{ data: KpiMasterEventApiDto[]; total: number }> {
-    // Set tenant context for RLS
+    query: Omit<GetKpiMasterEventsApiQueryDto, 'tenant_id' | 'company_id'> & {
+      company_id: string;
+    },
+  ): Promise<{ items: KpiMasterEventApiDto[]; total: number }> {
     await this.prisma.setTenantContext(tenantId);
 
-    // Build WHERE clause (double-guard: RLS + application level)
+    const {
+      company_id,
+      offset = 0,
+      limit = 50,
+      sort_by = 'created_at',
+      sort_order = 'desc',
+      keyword,
+      fiscal_year,
+      status,
+    } = query;
+
+    // WHERE条件構築
     const where: any = {
-      tenant_id: tenantId, // Required: tenant_id in WHERE clause
+      tenant_id: tenantId,
+      company_id,
       is_active: true,
     };
 
-    // Apply filters
-    if (filters.keyword) {
+    if (keyword) {
       where.OR = [
-        { event_code: { contains: filters.keyword, mode: 'insensitive' } },
-        { event_name: { contains: filters.keyword, mode: 'insensitive' } },
+        { event_code: { contains: keyword, mode: 'insensitive' } },
+        { event_name: { contains: keyword, mode: 'insensitive' } },
       ];
     }
 
-    if (filters.fiscalYear !== undefined) {
-      where.fiscal_year = filters.fiscalYear;
+    if (fiscal_year !== undefined) {
+      where.fiscal_year = fiscal_year;
     }
 
-    if (filters.status) {
-      where.status = filters.status;
+    if (status) {
+      where.status = status;
     }
 
-    // Build ORDER BY clause
+    // Count
+    const total = await this.prisma.kpi_master_events.count({ where });
+
+    // Find
     const orderBy: any = {};
-    const sortBy = filters.sortBy || 'event_code';
-    const sortOrder = filters.sortOrder || 'asc';
+    orderBy[sort_by] = sort_order;
 
-    // Map sortBy to database column names
-    const sortByMap: Record<string, string> = {
-      event_code: 'event_code',
-      event_name: 'event_name',
-      fiscal_year: 'fiscal_year',
-      created_at: 'created_at',
-    };
+    const events = await this.prisma.kpi_master_events.findMany({
+      where,
+      orderBy,
+      skip: offset,
+      take: limit,
+    });
 
-    orderBy[sortByMap[sortBy] || 'event_code'] = sortOrder;
-
-    // Execute query with pagination
-    const [data, total] = await Promise.all([
-      this.prisma.kpi_master_events.findMany({
-        where,
-        orderBy,
-        skip: filters.offset,
-        take: filters.limit,
-      }),
-      this.prisma.kpi_master_events.count({ where }),
-    ]);
-
-    // Map to API DTO
     return {
-      data: data.map((event) => this.mapToApiDto(event)),
+      items: events.map((e) => this.mapToApiDto(e)),
       total,
     };
   }
 
   /**
-   * Find KPI master event by ID
-   *
-   * @param tenantId - Tenant ID (required)
-   * @param id - Event ID
-   * @returns KPI master event or null if not found
+   * KPI管理イベント取得
    */
-  async findById(tenantId: string, id: string): Promise<KpiMasterEventApiDto | null> {
-    // Set tenant context for RLS
+  async findById(
+    tenantId: string,
+    id: string,
+  ): Promise<KpiMasterEventApiDto | null> {
     await this.prisma.setTenantContext(tenantId);
 
-    // Query with tenant_id double-guard
     const event = await this.prisma.kpi_master_events.findFirst({
       where: {
-        tenant_id: tenantId, // Required: tenant_id in WHERE clause
+        tenant_id: tenantId,
         id,
         is_active: true,
       },
@@ -118,25 +108,18 @@ export class KpiMasterEventRepository {
   }
 
   /**
-   * Find KPI master event by event code (for duplicate check)
-   *
-   * @param tenantId - Tenant ID (required)
-   * @param companyId - Company ID
-   * @param eventCode - Event code
-   * @returns KPI master event or null if not found
+   * event_code重複チェック
    */
   async findByEventCode(
     tenantId: string,
     companyId: string,
     eventCode: string,
   ): Promise<KpiMasterEventApiDto | null> {
-    // Set tenant context for RLS
     await this.prisma.setTenantContext(tenantId);
 
-    // Query with tenant_id double-guard
     const event = await this.prisma.kpi_master_events.findFirst({
       where: {
-        tenant_id: tenantId, // Required: tenant_id in WHERE clause
+        tenant_id: tenantId,
         company_id: companyId,
         event_code: eventCode,
         is_active: true,
@@ -147,33 +130,25 @@ export class KpiMasterEventRepository {
   }
 
   /**
-   * Create new KPI master event
-   *
-   * @param tenantId - Tenant ID (required)
-   * @param data - Event creation data
-   * @param userId - User ID for audit trail (optional)
-   * @returns Created KPI master event
+   * KPI管理イベント作成
    */
   async create(
     tenantId: string,
-    data: CreateKpiMasterEventApiDto,
-    userId?: string,
+    data: CreateKpiMasterEventApiDto & { created_by?: string },
   ): Promise<KpiMasterEventApiDto> {
-    // Set tenant context for RLS
     await this.prisma.setTenantContext(tenantId);
 
-    // Create event with tenant_id
     const event = await this.prisma.kpi_master_events.create({
       data: {
-        tenant_id: tenantId, // Required: tenant_id for multi-tenant isolation
-        company_id: data.companyId,
-        event_code: data.eventCode,
-        event_name: data.eventName,
-        fiscal_year: data.fiscalYear,
-        status: KpiMasterEventStatus.DRAFT, // Default status
+        tenant_id: tenantId,
+        company_id: data.company_id,
+        event_code: data.event_code,
+        event_name: data.event_name,
+        fiscal_year: data.fiscal_year,
+        status: 'DRAFT',
         is_active: true,
-        created_by: userId,
-        updated_by: userId,
+        created_by: data.created_by,
+        updated_by: data.created_by,
       },
     });
 
@@ -181,46 +156,24 @@ export class KpiMasterEventRepository {
   }
 
   /**
-   * Update KPI master event
-   *
-   * @param tenantId - Tenant ID (required)
-   * @param id - Event ID
-   * @param data - Event update data
-   * @param userId - User ID for audit trail (optional)
-   * @returns Updated KPI master event or null if not found
+   * KPI管理イベント更新
    */
   async update(
     tenantId: string,
     id: string,
-    data: Partial<CreateKpiMasterEventApiDto> & { status?: KpiMasterEventStatus },
-    userId?: string,
-  ): Promise<KpiMasterEventApiDto | null> {
-    // Set tenant context for RLS
+    data: UpdateKpiMasterEventApiDto & { updated_by?: string },
+  ): Promise<KpiMasterEventApiDto> {
     await this.prisma.setTenantContext(tenantId);
 
-    // Check if event exists with tenant_id double-guard
-    const existing = await this.prisma.kpi_master_events.findFirst({
-      where: {
-        tenant_id: tenantId, // Required: tenant_id in WHERE clause
-        id,
-        is_active: true,
-      },
-    });
-
-    if (!existing) {
-      return null;
-    }
-
-    // Update event
     const event = await this.prisma.kpi_master_events.update({
-      where: { id },
+      where: {
+        tenant_id: tenantId,
+        id,
+      },
       data: {
-        ...(data.companyId && { company_id: data.companyId }),
-        ...(data.eventCode && { event_code: data.eventCode }),
-        ...(data.eventName && { event_name: data.eventName }),
-        ...(data.fiscalYear && { fiscal_year: data.fiscalYear }),
-        ...(data.status && { status: data.status }),
-        updated_by: userId,
+        event_name: data.event_name,
+        status: data.status,
+        updated_by: data.updated_by,
       },
     });
 
@@ -228,24 +181,22 @@ export class KpiMasterEventRepository {
   }
 
   /**
-   * Map Prisma model to API DTO
-   *
-   * @param event - Prisma kpi_master_events model
-   * @returns KpiMasterEventApiDto
+   * Prisma model → API DTO 変換
    */
   private mapToApiDto(event: any): KpiMasterEventApiDto {
     return {
       id: event.id,
-      companyId: event.company_id,
-      eventCode: event.event_code,
-      eventName: event.event_name,
-      fiscalYear: event.fiscal_year,
-      status: event.status as KpiMasterEventStatus,
-      isActive: event.is_active,
-      createdAt: event.created_at.toISOString(),
-      updatedAt: event.updated_at.toISOString(),
-      createdBy: event.created_by || undefined,
-      updatedBy: event.updated_by || undefined,
+      tenant_id: event.tenant_id,
+      company_id: event.company_id,
+      event_code: event.event_code,
+      event_name: event.event_name,
+      fiscal_year: event.fiscal_year,
+      status: event.status,
+      is_active: event.is_active,
+      created_at: event.created_at.toISOString(),
+      updated_at: event.updated_at.toISOString(),
+      created_by: event.created_by,
+      updated_by: event.updated_by,
     };
   }
 }

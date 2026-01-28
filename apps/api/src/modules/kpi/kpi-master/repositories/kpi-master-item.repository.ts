@@ -1,125 +1,95 @@
+/**
+ * KPI Master Item Repository
+ *
+ * @module kpi/kpi-master
+ *
+ * Repository Requirements:
+ * - tenant_id required for all methods (RLS + application level double-guard)
+ * - WHERE clause double-guard required
+ * - set_config prerequisite (RLS enabled, no bypass)
+ *
+ * Spec: .kiro/specs/kpi/kpi-master/design.md (Repository Specification)
+ */
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
-import {
+import type {
   KpiMasterItemApiDto,
   CreateKpiMasterItemApiDto,
   UpdateKpiMasterItemApiDto,
   GetKpiMasterItemsApiQueryDto,
-} from '@epm-sdd/contracts/api/kpi-master';
-import { KpiType, HierarchyLevel } from '@epm-sdd/contracts/shared/enums/kpi';
+} from '@epm/contracts/api/kpi-master';
 
-/**
- * KpiMasterItemRepository
- *
- * Purpose:
- * - tenant_id required for all methods
- * - WHERE clause double-guard required (RLS + application level)
- * - set_config prerequisite (RLS enabled, no bypass)
- *
- * Repository Principles:
- * - All methods require tenantId as mandatory parameter
- * - All WHERE clauses must include tenant_id (RLS double-guard)
- * - Execute set_config('app.tenant_id', :tenant_id) before queries
- */
 @Injectable()
 export class KpiMasterItemRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Find all KPI master items with filters and pagination
-   *
-   * @param tenantId - Tenant ID (required)
-   * @param filters - Query filters (kpiEventId, parentKpiItemId, kpiType, hierarchyLevel, keyword)
-   * @param pagination - Pagination parameters (offset, limit, sortBy, sortOrder)
-   * @returns Array of KPI master items matching filters
+   * KPI項目一覧取得
    */
   async findAll(
     tenantId: string,
-    filters: GetKpiMasterItemsApiQueryDto,
-  ): Promise<{ data: KpiMasterItemApiDto[]; total: number }> {
-    // Set tenant context for RLS
+    query: Omit<GetKpiMasterItemsApiQueryDto, 'tenant_id'>,
+  ): Promise<KpiMasterItemApiDto[]> {
     await this.prisma.setTenantContext(tenantId);
 
-    // Build WHERE clause (double-guard: RLS + application level)
+    const {
+      event_id,
+      department_stable_ids,
+      kpi_type,
+      hierarchy_level,
+    } = query;
+
+    // WHERE条件構築
     const where: any = {
-      tenant_id: tenantId, // Required: tenant_id in WHERE clause
+      tenant_id: tenantId,
+      kpi_event_id: event_id,
       is_active: true,
     };
 
-    // Apply filters
-    if (filters.eventId) {
-      where.kpi_event_id = filters.eventId;
+    if (department_stable_ids && department_stable_ids.length > 0) {
+      where.department_stable_id = { in: department_stable_ids };
     }
 
-    if (filters.parentKpiItemId !== undefined) {
-      where.parent_kpi_item_id = filters.parentKpiItemId || null;
+    if (kpi_type) {
+      where.kpi_type = kpi_type;
     }
 
-    if (filters.kpiType) {
-      where.kpi_type = filters.kpiType;
+    if (hierarchy_level !== undefined) {
+      where.hierarchy_level = hierarchy_level;
     }
 
-    if (filters.hierarchyLevel !== undefined) {
-      where.hierarchy_level = filters.hierarchyLevel;
-    }
+    const items = await this.prisma.kpi_master_items.findMany({
+      where,
+      include: {
+        kpi_master_events: {
+          select: { company_id: true },
+        },
+      },
+      orderBy: [{ hierarchy_level: 'asc' }, { sort_order: 'asc' }],
+    });
 
-    if (filters.keyword) {
-      where.OR = [
-        { kpi_code: { contains: filters.keyword, mode: 'insensitive' } },
-        { kpi_name: { contains: filters.keyword, mode: 'insensitive' } },
-      ];
-    }
-
-    // Build ORDER BY clause
-    const orderBy: any = {};
-    const sortBy = filters.sortBy || 'sort_order';
-    const sortOrder = filters.sortOrder || 'asc';
-
-    // Map sortBy to database column names
-    const sortByMap: Record<string, string> = {
-      kpi_code: 'kpi_code',
-      kpi_name: 'kpi_name',
-      sort_order: 'sort_order',
-      created_at: 'created_at',
-    };
-
-    orderBy[sortByMap[sortBy] || 'sort_order'] = sortOrder;
-
-    // Execute query with pagination
-    const [data, total] = await Promise.all([
-      this.prisma.kpi_master_items.findMany({
-        where,
-        orderBy,
-        skip: filters.offset,
-        take: filters.limit,
-      }),
-      this.prisma.kpi_master_items.count({ where }),
-    ]);
-
-    // Map to API DTO
-    return {
-      data: data.map((item) => this.mapToApiDto(item)),
-      total,
-    };
+    return items.map((item) => this.mapToApiDto(item));
   }
 
   /**
-   * Find KPI master item by ID
-   *
-   * @param tenantId - Tenant ID (required)
-   * @param id - KPI item ID
-   * @returns KPI master item or null if not found
+   * KPI項目取得
    */
-  async findById(tenantId: string, id: string): Promise<KpiMasterItemApiDto | null> {
-    // Set tenant context for RLS
+  async findById(
+    tenantId: string,
+    id: string,
+  ): Promise<KpiMasterItemApiDto | null> {
     await this.prisma.setTenantContext(tenantId);
 
-    // Query with tenant_id double-guard
     const item = await this.prisma.kpi_master_items.findFirst({
       where: {
-        tenant_id: tenantId, // Required: tenant_id in WHERE clause
+        tenant_id: tenantId,
         id,
         is_active: true,
+      },
+      include: {
+        kpi_master_events: {
+          select: { company_id: true },
+        },
       },
     });
 
@@ -127,62 +97,105 @@ export class KpiMasterItemRepository {
   }
 
   /**
-   * Find all KPI master items by event ID
-   *
-   * @param tenantId - Tenant ID (required)
-   * @param eventId - KPI event ID
-   * @returns Array of KPI master items for the event
+   * イベント内KPI項目一覧取得
    */
-  async findByEventId(tenantId: string, eventId: string): Promise<KpiMasterItemApiDto[]> {
-    // Set tenant context for RLS
+  async findByEventId(
+    tenantId: string,
+    eventId: string,
+  ): Promise<KpiMasterItemApiDto[]> {
     await this.prisma.setTenantContext(tenantId);
 
-    // Query with tenant_id double-guard
     const items = await this.prisma.kpi_master_items.findMany({
       where: {
-        tenant_id: tenantId, // Required: tenant_id in WHERE clause
+        tenant_id: tenantId,
         kpi_event_id: eventId,
         is_active: true,
       },
-      orderBy: {
-        sort_order: 'asc',
+      include: {
+        kpi_master_events: {
+          select: { company_id: true },
+        },
       },
+      orderBy: [{ hierarchy_level: 'asc' }, { sort_order: 'asc' }],
     });
 
     return items.map((item) => this.mapToApiDto(item));
   }
 
   /**
-   * Create new KPI master item
-   *
-   * @param tenantId - Tenant ID (required)
-   * @param data - KPI item creation data
-   * @returns Created KPI master item
+   * kpi_code重複チェック（イベント内）
+   */
+  async findByKpiCode(
+    tenantId: string,
+    eventId: string,
+    kpiCode: string,
+  ): Promise<KpiMasterItemApiDto | null> {
+    await this.prisma.setTenantContext(tenantId);
+
+    const item = await this.prisma.kpi_master_items.findFirst({
+      where: {
+        tenant_id: tenantId,
+        kpi_event_id: eventId,
+        kpi_code: kpiCode,
+        is_active: true,
+      },
+      include: {
+        kpi_master_events: {
+          select: { company_id: true },
+        },
+      },
+    });
+
+    return item ? this.mapToApiDto(item) : null;
+  }
+
+  /**
+   * 子KPI項目の存在確認
+   */
+  async hasChildren(tenantId: string, parentId: string): Promise<boolean> {
+    await this.prisma.setTenantContext(tenantId);
+
+    const count = await this.prisma.kpi_master_items.count({
+      where: {
+        tenant_id: tenantId,
+        parent_kpi_item_id: parentId,
+        is_active: true,
+      },
+    });
+
+    return count > 0;
+  }
+
+  /**
+   * KPI項目作成
    */
   async create(
     tenantId: string,
     data: CreateKpiMasterItemApiDto,
   ): Promise<KpiMasterItemApiDto> {
-    // Set tenant context for RLS
     await this.prisma.setTenantContext(tenantId);
 
-    // Create KPI item with tenant_id
     const item = await this.prisma.kpi_master_items.create({
       data: {
-        tenant_id: tenantId, // Required: tenant_id for multi-tenant isolation
-        kpi_event_id: data.kpiEventId,
-        parent_kpi_item_id: data.parentKpiItemId,
-        kpi_code: data.kpiCode,
-        kpi_name: data.kpiName,
-        kpi_type: data.kpiType,
-        hierarchy_level: data.hierarchyLevel,
-        ref_subject_id: data.refSubjectId,
-        ref_kpi_definition_id: data.refKpiDefinitionId,
-        ref_metric_id: data.refMetricId,
-        department_stable_id: data.departmentStableId,
-        owner_employee_id: data.ownerEmployeeId,
-        sort_order: data.sortOrder ?? 1,
+        tenant_id: tenantId,
+        kpi_event_id: data.event_id,
+        parent_kpi_item_id: data.parent_kpi_item_id,
+        kpi_code: data.kpi_code,
+        kpi_name: data.kpi_name,
+        kpi_type: data.kpi_type,
+        hierarchy_level: data.hierarchy_level,
+        ref_subject_id: data.ref_subject_id,
+        ref_kpi_definition_id: data.ref_kpi_definition_id,
+        ref_metric_id: data.ref_metric_id,
+        department_stable_id: data.department_stable_id,
+        owner_employee_id: data.owner_employee_id,
+        sort_order: data.sort_order ?? 1,
         is_active: true,
+      },
+      include: {
+        kpi_master_events: {
+          select: { company_id: true },
+        },
       },
     });
 
@@ -190,46 +203,30 @@ export class KpiMasterItemRepository {
   }
 
   /**
-   * Update KPI master item
-   *
-   * @param tenantId - Tenant ID (required)
-   * @param id - KPI item ID
-   * @param data - KPI item update data
-   * @returns Updated KPI master item or null if not found
+   * KPI項目更新
    */
   async update(
     tenantId: string,
     id: string,
     data: UpdateKpiMasterItemApiDto,
-  ): Promise<KpiMasterItemApiDto | null> {
-    // Set tenant context for RLS
+  ): Promise<KpiMasterItemApiDto> {
     await this.prisma.setTenantContext(tenantId);
 
-    // Check if item exists with tenant_id double-guard
-    const existing = await this.prisma.kpi_master_items.findFirst({
-      where: {
-        tenant_id: tenantId, // Required: tenant_id in WHERE clause
-        id,
-        is_active: true,
-      },
-    });
-
-    if (!existing) {
-      return null;
-    }
-
-    // Update KPI item
     const item = await this.prisma.kpi_master_items.update({
-      where: { id },
+      where: {
+        tenant_id: tenantId,
+        id,
+      },
       data: {
-        ...(data.kpiName && { kpi_name: data.kpiName }),
-        ...(data.departmentStableId !== undefined && {
-          department_stable_id: data.departmentStableId,
-        }),
-        ...(data.ownerEmployeeId !== undefined && {
-          owner_employee_id: data.ownerEmployeeId,
-        }),
-        ...(data.sortOrder !== undefined && { sort_order: data.sortOrder }),
+        kpi_name: data.kpi_name,
+        department_stable_id: data.department_stable_id,
+        owner_employee_id: data.owner_employee_id,
+        sort_order: data.sort_order,
+      },
+      include: {
+        kpi_master_events: {
+          select: { company_id: true },
+        },
       },
     });
 
@@ -237,64 +234,45 @@ export class KpiMasterItemRepository {
   }
 
   /**
-   * Delete KPI master item (logical delete)
-   *
-   * @param tenantId - Tenant ID (required)
-   * @param id - KPI item ID
-   * @returns true if deleted, false if not found
+   * KPI項目削除（論理削除）
    */
-  async delete(tenantId: string, id: string): Promise<boolean> {
-    // Set tenant context for RLS
+  async delete(tenantId: string, id: string): Promise<void> {
     await this.prisma.setTenantContext(tenantId);
 
-    // Check if item exists with tenant_id double-guard
-    const existing = await this.prisma.kpi_master_items.findFirst({
-      where: {
-        tenant_id: tenantId, // Required: tenant_id in WHERE clause
-        id,
-        is_active: true,
-      },
-    });
-
-    if (!existing) {
-      return false;
-    }
-
-    // Logical delete
     await this.prisma.kpi_master_items.update({
-      where: { id },
+      where: {
+        tenant_id: tenantId,
+        id,
+      },
       data: {
         is_active: false,
       },
     });
-
-    return true;
   }
 
   /**
-   * Map Prisma model to API DTO
-   *
-   * @param item - Prisma kpi_master_items model
-   * @returns KpiMasterItemApiDto
+   * Prisma model → API DTO 変換
    */
   private mapToApiDto(item: any): KpiMasterItemApiDto {
     return {
       id: item.id,
-      kpiEventId: item.kpi_event_id,
-      parentKpiItemId: item.parent_kpi_item_id || undefined,
-      kpiCode: item.kpi_code,
-      kpiName: item.kpi_name,
-      kpiType: item.kpi_type as KpiType,
-      hierarchyLevel: item.hierarchy_level as HierarchyLevel,
-      refSubjectId: item.ref_subject_id || undefined,
-      refKpiDefinitionId: item.ref_kpi_definition_id || undefined,
-      refMetricId: item.ref_metric_id || undefined,
-      departmentStableId: item.department_stable_id || undefined,
-      ownerEmployeeId: item.owner_employee_id || undefined,
-      sortOrder: item.sort_order,
-      isActive: item.is_active,
-      createdAt: item.created_at.toISOString(),
-      updatedAt: item.updated_at.toISOString(),
+      tenant_id: item.tenant_id,
+      company_id: item.kpi_master_events.company_id,
+      event_id: item.kpi_event_id,
+      parent_kpi_item_id: item.parent_kpi_item_id,
+      kpi_code: item.kpi_code,
+      kpi_name: item.kpi_name,
+      kpi_type: item.kpi_type,
+      hierarchy_level: item.hierarchy_level,
+      ref_subject_id: item.ref_subject_id,
+      ref_kpi_definition_id: item.ref_kpi_definition_id,
+      ref_metric_id: item.ref_metric_id,
+      department_stable_id: item.department_stable_id,
+      owner_employee_id: item.owner_employee_id,
+      sort_order: item.sort_order,
+      is_active: item.is_active,
+      created_at: item.created_at.toISOString(),
+      updated_at: item.updated_at.toISOString(),
     };
   }
 }

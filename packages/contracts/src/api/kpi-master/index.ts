@@ -56,6 +56,15 @@ export interface CreateKpiMasterEventApiDto {
   created_by: string;
 }
 
+/**
+ * Update KPI Master Event API DTO
+ */
+export interface UpdateKpiMasterEventApiDto {
+  event_name?: string;
+  status?: 'DRAFT' | 'CONFIRMED';
+  updated_by: string;
+}
+
 // =============================================================================
 // KPI Item DTOs
 // =============================================================================
@@ -79,6 +88,7 @@ export interface KpiMasterItemApiDto {
   department_stable_id?: string;
   owner_employee_id?: string;
   unit?: string;
+  sort_order: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -117,6 +127,7 @@ export interface CreateKpiMasterItemApiDto {
   department_stable_id?: string;
   owner_employee_id?: string;
   unit?: string;
+  sort_order?: number;
   created_by: string;
 }
 
@@ -128,6 +139,7 @@ export interface UpdateKpiMasterItemApiDto {
   department_stable_id?: string;
   owner_employee_id?: string;
   unit?: string;
+  sort_order?: number;
   updated_by: string;
 }
 
@@ -163,6 +175,8 @@ export interface GetKpiDefinitionsApiQueryDto {
   company_id: string;
   offset?: number;
   limit?: number;
+  sort_by?: 'kpi_code' | 'kpi_name' | 'created_at';
+  sort_order?: 'asc' | 'desc';
   keyword?: string;
 }
 
@@ -191,6 +205,7 @@ export interface CreateKpiDefinitionApiDto {
 export interface KpiFactAmountApiDto {
   id: string;
   tenant_id: string;
+  company_id: string;
   event_id: string;
   kpi_definition_id: string;
   department_stable_id?: string;
@@ -199,6 +214,7 @@ export interface KpiFactAmountApiDto {
   period_end_date?: string;
   target_value?: number;
   actual_value?: number;
+  notes?: string;
   created_at: string;
   updated_at: string;
   created_by?: string;
@@ -228,6 +244,7 @@ export interface CreateKpiFactAmountApiDto {
   period_end_date?: string;
   target_value?: number;
   actual_value?: number;
+  notes?: string;
   created_by: string;
 }
 
@@ -237,6 +254,7 @@ export interface CreateKpiFactAmountApiDto {
 export interface UpdateKpiFactAmountApiDto {
   target_value?: number;
   actual_value?: number;
+  notes?: string;
   updated_by: string;
 }
 
@@ -252,13 +270,9 @@ export interface KpiTargetValueApiDto {
   tenant_id: string;
   kpi_master_item_id: string;
   period_code: string;
-  period_start_date?: string;
-  period_end_date?: string;
   target_value: number;
   created_at: string;
   updated_at: string;
-  created_by?: string;
-  updated_by?: string;
 }
 
 /**
@@ -276,10 +290,7 @@ export interface CreateKpiTargetValueApiDto {
   tenant_id: string;
   kpi_master_item_id: string;
   period_code: string;
-  period_start_date?: string;
-  period_end_date?: string;
   target_value: number;
-  created_by: string;
 }
 
 /**
@@ -287,7 +298,6 @@ export interface CreateKpiTargetValueApiDto {
  */
 export interface UpdateKpiTargetValueApiDto {
   target_value: number;
-  updated_by: string;
 }
 
 // =============================================================================
