@@ -10,6 +10,18 @@
  */
 'use client';
 
+import {
+  ChartComponent,
+  SeriesCollectionDirective,
+  SeriesDirective,
+  Inject,
+  LineSeries,
+  ColumnSeries,
+  Category,
+  Legend,
+  Tooltip,
+  DataLabel,
+} from '@syncfusion/ej2-react-charts';
 import type { BffWidgetDto, BffWidgetDataResponseDto, CompositeChartDisplayConfig } from '@epm/contracts/bff/dashboard';
 
 interface CompositeChartWidgetProps {
@@ -18,32 +30,93 @@ interface CompositeChartWidgetProps {
 }
 
 /**
- * Composite Chart Widget Component (Stub)
- * Full implementation with SyncFusion Charts in Phase 2
+ * Composite Chart Widget Component
+ * Displays combined line and bar chart with dual Y-axis using SyncFusion Charts
  */
 export function CompositeChartWidget({ widget, data }: CompositeChartWidgetProps) {
   const displayConfig = widget.displayConfig as CompositeChartDisplayConfig;
 
+  // Prepare primary series data (Column/Bar)
+  const primarySeriesData = data.dataPoints.map(dp => ({
+    x: dp.label,
+    y: dp.value,
+  }));
+
+  // Prepare compare series data if exists (Line)
+  const hasCompareData = data.dataPoints.some(dp => dp.compareValue !== null && dp.compareValue !== undefined);
+  const compareSeriesData = hasCompareData
+    ? data.dataPoints.map(dp => ({
+        x: dp.label,
+        y: dp.compareValue ?? null,
+      }))
+    : [];
+
   return (
     <div className="h-full flex flex-col">
-      {/* Chart area placeholder */}
-      <div className="flex-1 bg-neutral-50 rounded border border-neutral-200 flex items-center justify-center">
-        <div className="text-center text-neutral-400">
-          <div className="text-sm font-semibold">複合チャート</div>
-          <div className="text-xs mt-1">
-            主軸: {displayConfig.primaryAxis || 'left'}
-          </div>
-          <div className="text-xs">
-            副軸: {displayConfig.secondaryAxis || 'right'}
-          </div>
-          <div className="text-xs">
-            データポイント数: {data.dataPoints.length}
-          </div>
-          <div className="text-xs mt-2 text-neutral-300">
-            （SyncFusion Charts統合時に実装）
-          </div>
-        </div>
-      </div>
+      <ChartComponent
+        id={`composite-chart-${widget.id}`}
+        height="100%"
+        primaryXAxis={{
+          valueType: 'Category',
+          edgeLabelPlacement: 'Shift',
+        }}
+        primaryYAxis={{
+          labelFormat: data.unit ? `{value}${data.unit}` : '{value}',
+          title: data.meta?.sourceName || 'Primary',
+          titleStyle: { color: '#3b82f6' },
+          labelStyle: { color: '#3b82f6' },
+        }}
+        axes={hasCompareData ? [{
+          name: 'secondaryYAxis',
+          opposedPosition: true,
+          labelFormat: '{value}',
+          title: 'Compare',
+          titleStyle: { color: '#f59e0b' },
+          labelStyle: { color: '#f59e0b' },
+        }] : []}
+        tooltip={{
+          enable: true,
+          shared: true,
+        }}
+        legendSettings={{
+          visible: displayConfig.showLegend ?? true,
+          position: 'Bottom',
+        }}
+        background="transparent"
+      >
+        <Inject services={[LineSeries, ColumnSeries, Category, Legend, Tooltip, DataLabel]} />
+        <SeriesCollectionDirective>
+          {/* Primary Series - Column Chart */}
+          <SeriesDirective
+            dataSource={primarySeriesData}
+            xName="x"
+            yName="y"
+            name={data.meta?.sourceName || 'Primary'}
+            type="Column"
+            columnWidth={0.6}
+            fill="#3b82f6"
+          />
+
+          {/* Compare Series - Line Chart on secondary Y-axis */}
+          {hasCompareData && (
+            <SeriesDirective
+              dataSource={compareSeriesData}
+              xName="x"
+              yName="y"
+              name="Compare"
+              type="Line"
+              width={2}
+              marker={{
+                visible: true,
+                width: 6,
+                height: 6,
+              }}
+              fill="#f59e0b"
+              yAxisName="secondaryYAxis"
+            />
+          )}
+        </SeriesCollectionDirective>
+      </ChartComponent>
     </div>
   );
 }

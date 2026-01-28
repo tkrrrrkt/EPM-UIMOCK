@@ -11,7 +11,16 @@
  */
 'use client';
 
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/shared/ui';
+import {
+  GridComponent,
+  ColumnsDirective,
+  ColumnDirective,
+  Inject,
+  Sort,
+  Toolbar,
+  ExcelExport,
+  Page,
+} from '@syncfusion/ej2-react-grids';
 import type { BffWidgetDto, BffWidgetDataResponseDto, TableDisplayConfig } from '@epm/contracts/bff/dashboard';
 
 interface TableWidgetProps {
@@ -21,64 +30,88 @@ interface TableWidgetProps {
 
 /**
  * Table Widget Component
- * Displays data in table format with comparison columns
+ * Displays data in table format with SyncFusion DataGrid
  */
 export function TableWidget({ widget, data }: TableWidgetProps) {
   const displayConfig = widget.displayConfig as TableDisplayConfig;
 
+  // Prepare table data
+  const tableData = data.dataPoints.map((dp, idx) => ({
+    id: idx,
+    label: dp.label,
+    value: dp.value,
+    compareValue: dp.compareValue ?? null,
+    difference: dp.value !== null && dp.compareValue !== null && dp.compareValue !== undefined
+      ? dp.value - dp.compareValue
+      : null,
+  }));
+
   // Format number with commas
-  const formatNumber = (num: number | null) => {
-    if (num === null) return '-';
-    return num.toLocaleString('ja-JP', { maximumFractionDigits: 1 });
+  const formatNumber = (value: number | null) => {
+    if (value === null) return '-';
+    return value.toLocaleString('ja-JP', { maximumFractionDigits: 1 });
+  };
+
+  // Number template for formatting
+  const numberTemplate = (props: any) => {
+    return <span>{formatNumber(props.value)}</span>;
+  };
+
+  const compareValueTemplate = (props: any) => {
+    return <span>{formatNumber(props.compareValue)}</span>;
+  };
+
+  const differenceTemplate = (props: any) => {
+    const diff = props.difference;
+    if (diff === null) return <span>-</span>;
+    const color = diff >= 0 ? 'text-success-600' : 'text-error-600';
+    return <span className={color}>{formatNumber(diff)}</span>;
   };
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>期間</TableHead>
-              <TableHead className="text-right">値</TableHead>
-              {displayConfig.showCompareColumns && (
-                <>
-                  <TableHead className="text-right">比較値</TableHead>
-                  <TableHead className="text-right">差異</TableHead>
-                </>
-              )}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.dataPoints.map((point, idx) => (
-              <TableRow key={idx}>
-                <TableCell>{point.label}</TableCell>
-                <TableCell className="text-right font-medium">
-                  {formatNumber(point.value)}
-                </TableCell>
-                {displayConfig.showCompareColumns && (
-                  <>
-                    <TableCell className="text-right">
-                      {formatNumber(point.compareValue ?? null)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {point.value !== null && point.compareValue !== null && point.compareValue !== undefined
-                        ? formatNumber(point.value - point.compareValue)
-                        : '-'}
-                    </TableCell>
-                  </>
-                )}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Footer with unit */}
-      {data.unit && (
-        <div className="mt-2 text-xs text-neutral-500 text-right">
-          単位: {data.unit}
-        </div>
-      )}
+    <div className="h-full flex flex-col">
+      <GridComponent
+        dataSource={tableData}
+        allowSorting={true}
+        allowPaging={false}
+        height="100%"
+        gridLines="Both"
+      >
+        <ColumnsDirective>
+          <ColumnDirective
+            field="label"
+            headerText="期間"
+            width="120"
+            textAlign="Left"
+          />
+          <ColumnDirective
+            field="value"
+            headerText={`値${data.unit ? ` (${data.unit})` : ''}`}
+            width="120"
+            textAlign="Right"
+            template={numberTemplate}
+          />
+          {displayConfig.showCompareColumns && (
+            <>
+              <ColumnDirective
+                field="compareValue"
+                headerText={`比較値${data.unit ? ` (${data.unit})` : ''}`}
+                width="120"
+                textAlign="Right"
+                template={compareValueTemplate}
+              />
+              <ColumnDirective
+                field="difference"
+                headerText={`差異${data.unit ? ` (${data.unit})` : ''}`}
+                width="120"
+                textAlign="Right"
+                template={differenceTemplate}
+              />
+            </>
+          )}
+        </ColumnsDirective>
+        <Inject services={[Sort, Toolbar, ExcelExport, Page]} />
+      </GridComponent>
     </div>
   );
 }
