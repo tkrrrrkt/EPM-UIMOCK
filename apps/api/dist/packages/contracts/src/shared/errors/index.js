@@ -30,4 +30,9 @@ __exportStar(require("./KpiTargetValueNotFoundError"), exports);
 __exportStar(require("./KpiManagedSubjectNotFoundError"), exports);
 __exportStar(require("./KpiManagedMetricNotFoundError"), exports);
 __exportStar(require("./ActionPlanInvalidReferenceError"), exports);
+__exportStar(require("./DashboardNotFoundError"), exports);
+__exportStar(require("./DashboardAccessDeniedError"), exports);
+__exportStar(require("./DashboardDeleteForbiddenError"), exports);
+__exportStar(require("./WidgetDataError"), exports);
+__exportStar(require("./InvalidFilterConfigError"), exports);
 //# sourceMappingURL=index.js.map

@@ -14,18 +14,28 @@ const common_1 = require("@nestjs/common");
 const kpi_definition_repository_1 = require("../repositories/kpi-definition.repository");
 const errors_1 = require("../../../../../../../packages/contracts/src/shared/errors");
 let KpiDefinitionService = class KpiDefinitionService {
-    constructor(definitionRepository) {
-        this.definitionRepository = definitionRepository;
+    constructor(kpiDefinitionRepository) {
+        this.kpiDefinitionRepository = kpiDefinitionRepository;
     }
-    async findAll(tenantId, filters) {
-        return this.definitionRepository.findAll(tenantId, filters);
+    async findAllDefinitions(tenantId, query) {
+        return this.kpiDefinitionRepository.findAll(tenantId, query);
     }
-    async create(tenantId, data, userId) {
-        const existing = await this.definitionRepository.findByCode(tenantId, data.companyId, data.kpiCode);
-        if (existing) {
-            throw new errors_1.KpiDefinitionDuplicateError(`KPI definition code already exists: ${data.kpiCode} in company ${data.companyId}`);
+    async createDefinition(tenantId, userId, data) {
+        const existingDefinition = await this.kpiDefinitionRepository.findByKpiCode(tenantId, data.company_id, data.kpi_code);
+        if (existingDefinition) {
+            throw new errors_1.KpiDefinitionDuplicateError(`KPI code already exists: ${data.kpi_code}`);
         }
-        const definition = await this.definitionRepository.create(tenantId, data, userId);
+        const definition = await this.kpiDefinitionRepository.create(tenantId, {
+            tenant_id: tenantId,
+            company_id: data.company_id,
+            kpi_code: data.kpi_code,
+            kpi_name: data.kpi_name,
+            description: data.description,
+            unit: data.unit,
+            aggregation_method: data.aggregation_method,
+            direction: data.direction,
+            created_by: userId,
+        });
         return definition;
     }
 };

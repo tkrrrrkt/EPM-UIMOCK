@@ -1,28 +1,23 @@
 import { KpiMasterItemRepository } from '../repositories/kpi-master-item.repository';
 import { KpiMasterEventRepository } from '../repositories/kpi-master-event.repository';
-import { SubjectRepository } from '../repositories/subject.repository';
-import { MetricRepository } from '../repositories/metric.repository';
-import { KpiMasterItemApiDto, CreateKpiMasterItemApiDto, UpdateKpiMasterItemApiDto, GetKpiMasterItemsApiQueryDto } from '@epm-sdd/contracts/api/kpi-master';
+import type { KpiMasterItemApiDto, CreateKpiMasterItemApiDto, UpdateKpiMasterItemApiDto, GetKpiMasterItemsApiQueryDto } from '@epm/contracts/api/kpi-master';
+export interface UserContext {
+    userId: string;
+    permissions: string[];
+    controlDepartmentStableIds: string[];
+}
 export declare class KpiMasterItemService {
-    private readonly itemRepository;
-    private readonly eventRepository;
-    private readonly subjectRepository;
-    private readonly metricRepository;
-    constructor(itemRepository: KpiMasterItemRepository, eventRepository: KpiMasterEventRepository, subjectRepository: SubjectRepository, metricRepository: MetricRepository);
-    findAll(tenantId: string, filters: GetKpiMasterItemsApiQueryDto, userPermissions?: {
-        hasAdminPermission: boolean;
-        controlDepartmentStableIds: string[];
-    }): Promise<{
-        data: KpiMasterItemApiDto[];
-        total: number;
-    }>;
-    findById(tenantId: string, id: string, userPermissions?: {
-        hasAdminPermission: boolean;
-        controlDepartmentStableIds: string[];
+    private readonly kpiMasterItemRepository;
+    private readonly kpiMasterEventRepository;
+    constructor(kpiMasterItemRepository: KpiMasterItemRepository, kpiMasterEventRepository: KpiMasterEventRepository);
+    findAllItems(tenantId: string, query: Omit<GetKpiMasterItemsApiQueryDto, 'tenant_id'>, userContext: UserContext): Promise<KpiMasterItemApiDto[]>;
+    findItemById(tenantId: string, id: string, userContext: UserContext): Promise<KpiMasterItemApiDto>;
+    createItem(tenantId: string, userId: string, data: Omit<CreateKpiMasterItemApiDto, 'tenant_id' | 'created_by'> & {
+        company_id: string;
     }): Promise<KpiMasterItemApiDto>;
-    findByEventId(tenantId: string, eventId: string): Promise<KpiMasterItemApiDto[]>;
-    create(tenantId: string, data: CreateKpiMasterItemApiDto, userId?: string): Promise<KpiMasterItemApiDto>;
-    update(tenantId: string, id: string, data: UpdateKpiMasterItemApiDto, userId?: string): Promise<KpiMasterItemApiDto>;
-    delete(tenantId: string, id: string, userId?: string): Promise<void>;
-    private validateTypeReferences;
+    updateItem(tenantId: string, id: string, userId: string, data: Omit<UpdateKpiMasterItemApiDto, 'updated_by'>, userContext: UserContext): Promise<KpiMasterItemApiDto>;
+    deleteItem(tenantId: string, id: string, userId: string, userContext: UserContext): Promise<void>;
+    private validateKpiTypeReferences;
+    private checkReadPermission;
+    private checkWritePermission;
 }

@@ -1,9 +1,9 @@
 import { KpiTargetValueRepository } from '../repositories/kpi-target-value.repository';
-import { KpiTargetValueApiDto, CreateKpiTargetValueApiDto } from '@epm-sdd/contracts/api/kpi-master';
+import type { KpiTargetValueApiDto, CreateKpiTargetValueApiDto, UpdateKpiTargetValueApiDto } from '@epm/contracts/api/kpi-master';
 export declare class KpiTargetValueService {
-    private readonly targetValueRepository;
-    constructor(targetValueRepository: KpiTargetValueRepository);
+    private readonly kpiTargetValueRepository;
+    constructor(kpiTargetValueRepository: KpiTargetValueRepository);
     findByItemId(tenantId: string, kpiMasterItemId: string): Promise<KpiTargetValueApiDto[]>;
-    create(tenantId: string, data: CreateKpiTargetValueApiDto, userId?: string): Promise<KpiTargetValueApiDto>;
-    update(tenantId: string, id: string, data: Partial<CreateKpiTargetValueApiDto>, userId?: string): Promise<KpiTargetValueApiDto>;
+    createTargetValue(tenantId: string, data: Omit<CreateKpiTargetValueApiDto, 'tenant_id'>): Promise<KpiTargetValueApiDto>;
+    updateTargetValue(tenantId: string, id: string, data: UpdateKpiTargetValueApiDto): Promise<KpiTargetValueApiDto>;
 }

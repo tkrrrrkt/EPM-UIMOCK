@@ -1,2 +1,2 @@
-export declare class KpiMasterModule {
+export declare class KpiMasterBffModule {
 }

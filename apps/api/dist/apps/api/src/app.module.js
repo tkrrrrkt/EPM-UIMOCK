@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_module_1 = require("./prisma/prisma.module");
+const dashboard_module_1 = require("./modules/reporting/dashboard/dashboard.module");
 const kpi_master_module_1 = require("./modules/kpi/kpi-master/kpi-master.module");
 let AppModule = class AppModule {
 };
@@ -17,6 +18,7 @@ exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
         imports: [
             prisma_module_1.PrismaModule,
+            dashboard_module_1.DashboardModule,
             kpi_master_module_1.KpiMasterModule,
         ],
     })

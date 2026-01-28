@@ -21,6 +21,5 @@
       "@epm/contracts/*": ["../../packages/contracts/src/*"],
       "@epm-sdd/contracts/*": ["../../packages/contracts/src/*"]
     }
-  },
-  "exclude": ["**/*.test.ts", "**/*.spec.ts", "**/__tests__/**"]
+  }
 }

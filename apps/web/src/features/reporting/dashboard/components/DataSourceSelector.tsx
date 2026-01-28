@@ -21,7 +21,7 @@
  */
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Label,
   Input,
@@ -33,7 +33,8 @@ import {
   Button,
 } from '@/shared/ui';
 import { X, Plus, Info } from 'lucide-react';
-import type { DataSource, DataSourceType } from '@epm/contracts/bff/dashboard';
+import { bffClient } from '../api/client';
+import type { DataSource, DataSourceType, BffKpiDefinitionOption } from '@epm/contracts/bff/dashboard';
 
 interface DataSourceSelectorProps {
   dataSources: DataSource[];
@@ -50,6 +51,10 @@ export function DataSourceSelector({
   onChange,
   className = '',
 }: DataSourceSelectorProps) {
+  const [kpiOptions, setKpiOptions] = useState<BffKpiDefinitionOption[]>([]);
+  const [kpiLoading, setKpiLoading] = useState(false);
+  const [kpiError, setKpiError] = useState<string | null>(null);
+
   // Handle add data source
   const handleAdd = useCallback(() => {
     const newSource: DataSource = {
@@ -79,6 +84,39 @@ export function DataSourceSelector({
     [dataSources, onChange]
   );
 
+  const hasKpiSource = dataSources.some((source) => source.type === 'KPI');
+
+  useEffect(() => {
+    if (!hasKpiSource || kpiOptions.length > 0) return;
+
+    let active = true;
+
+    const fetchKpiDefinitions = async () => {
+      setKpiLoading(true);
+      setKpiError(null);
+      try {
+        const response = await bffClient.getKpiDefinitions();
+        if (active) {
+          setKpiOptions(response.items);
+        }
+      } catch (err) {
+        if (active) {
+          setKpiError(err instanceof Error ? err.message : 'KPI定義の取得に失敗しました');
+        }
+      } finally {
+        if (active) {
+          setKpiLoading(false);
+        }
+      }
+    };
+
+    fetchKpiDefinitions();
+
+    return () => {
+      active = false;
+    };
+  }, [hasKpiSource, kpiOptions.length]);
+
   return (
     <div className={`space-y-3 ${className}`}>
       <div className="flex items-center justify-between">
@@ -96,11 +134,11 @@ export function DataSourceSelector({
           <div>
             <p className="font-medium mb-1">データソース選択について</p>
             <p>
-              現在は参照IDを直接入力する方式です。将来的には、種別に応じた選択UIが実装される予定です：
+              現在は一部で選択UIに対応しています。未対応の種別は参照IDを直接入力します：
             </p>
             <ul className="mt-1 ml-4 list-disc space-y-0.5">
               <li>Fact: 勘定科目ツリーから選択</li>
-              <li>KPI: KPI定義リストから選択</li>
+              <li>KPI: KPI定義リストから選択（対応済）</li>
               <li>Metric: 指標マスタリストから選択</li>
             </ul>
           </div>
@@ -175,25 +213,63 @@ export function DataSourceSelector({
                 <Label htmlFor={`source-ref-${index}`} className="text-xs text-neutral-600">
                   参照ID
                 </Label>
-                <Input
-                  id={`source-ref-${index}`}
-                  value={source.refId}
-                  onChange={(e) =>
-                    handleUpdate(index, { refId: e.target.value })
-                  }
-                  placeholder={
-                    source.type === 'FACT'
-                      ? '例: 10001 (売上高)'
-                      : source.type === 'KPI'
-                      ? '例: kpi-001'
-                      : '例: metric-001'
-                  }
-                />
-                <p className="text-xs text-neutral-500">
-                  {source.type === 'FACT' && '勘定科目コードを入力'}
-                  {source.type === 'KPI' && 'KPI定義IDを入力'}
-                  {source.type === 'METRIC' && '指標マスタIDを入力'}
-                </p>
+                {source.type === 'KPI' ? (
+                  <>
+                    <Select
+                      value={source.refId}
+                      onValueChange={(value) => {
+                        const selected = kpiOptions.find((opt) => opt.id === value);
+                        handleUpdate(index, {
+                          refId: value,
+                          label: selected?.kpiName || source.label,
+                        });
+                      }}
+                    >
+                      <SelectTrigger id={`source-ref-${index}`}>
+                        <SelectValue placeholder="KPI定義を選択" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {kpiLoading && (
+                          <SelectItem value="__loading__" disabled>
+                            読み込み中...
+                          </SelectItem>
+                        )}
+                        {!kpiLoading && kpiOptions.length === 0 && (
+                          <SelectItem value="__empty__" disabled>
+                            選択可能なKPI定義がありません
+                          </SelectItem>
+                        )}
+                        {kpiOptions.map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.kpiCode} - {option.kpiName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {kpiError && (
+                      <p className="text-xs text-error-600">{kpiError}</p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Input
+                      id={`source-ref-${index}`}
+                      value={source.refId}
+                      onChange={(e) =>
+                        handleUpdate(index, { refId: e.target.value })
+                      }
+                      placeholder={
+                        source.type === 'FACT'
+                          ? '例: 10001 (売上高)'
+                          : '例: metric-001'
+                      }
+                    />
+                    <p className="text-xs text-neutral-500">
+                      {source.type === 'FACT' && '勘定科目コードを入力'}
+                      {source.type === 'METRIC' && '指標マスタIDを入力'}
+                    </p>
+                  </>
+                )}
               </div>
 
               {/* Label (for legend) */}

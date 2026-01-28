@@ -2,13 +2,23 @@
 
 ---
 
+## 改訂履歴
+
+| 日付 | 変更内容 |
+|------|---------|
+| 2026-01-25 | 初版作成（壁打ち検討結果を反映） |
+| 2026-01-26 | 画面設計をベスト設計（2画面統合型 + サマリカード + スマート動線）に更新 |
+| 2026-01-26 | **Design Review GO判定**（軽微指摘1件：kpi_fact_amounts逆Relation → 実装時対応） |
+
+---
+
 ## Spec Reference（INPUT情報）
 
 本設計を作成するにあたり、以下の情報を確認した：
 
 ### Requirements（直接INPUT）
 - **参照ファイル**: `.kiro/specs/kpi/kpi-master/requirements.md`
-- **要件バージョン**: 2026-01-25
+- **要件バージョン**: 2026-01-26（ベスト設計反映版）
 
 ### 仕様概要（確定済み仕様）
 - **参照ファイル**: `.kiro/specs/仕様概要/KPI管理マスタ機能仕様_確定版.md`
@@ -19,8 +29,65 @@
   - 部門別閲覧権限により、コントロール部門に基づく権限制御を実現する
   - Phase 1では指標の自動計算を除外し、目標値管理のみ実装する
 
+### 画面設計改善（2026-01-26決定）
+- **設計方針**: 2画面統合型 + サマリカード + スマート動線
+- **改善ポイント**:
+  - KPI一覧をメイン画面とし、ダッシュボード機能を統合（サマリカード追加）
+  - AP行に[WBS][かんばん]ボタンを直接配置し、動線を明確化
+  - KPIマスタ設定は管理者向け画面として分離
+
+### UI画面設計詳細
+
+#### 画面構成（2画面統合型）
+
+| 画面名 | ルート | 目的 | 主要コンポーネント |
+|--------|--------|------|-------------------|
+| KPI一覧 | `/kpi/list` | メイン操作画面（ダッシュボード統合） | サマリカード、階層ツリー、パネル展開式 |
+| KPIマスタ設定 | `/kpi/master` | 管理者向け設定画面 | イベント管理、KPI項目登録 |
+
+#### KPI一覧画面レイアウト
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│ [ヘッダー] KPI一覧                     [年度選択▼] [部門フィルタ▼] │
+├────────────────────────────────────────────────────────────────┤
+│ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐              │
+│ │総KPI数   │ │達成率   │ │遅延AP数 │ │要注目   │ ← サマリカード │
+│ │   24    │ │  78%   │ │   3    │ │   5    │              │
+│ └─────────┘ └─────────┘ └─────────┘ └─────────┘              │
+├────────────────────────────────────────────────────────────────┤
+│ ▼ 売上高 [FINANCIAL] Lv1                                      │
+│   ├─ ▼ 売上高KPI [FINANCIAL] Lv2  達成率: 85%                  │
+│   │    ├─ 予実表: Q1 Q2 Q3 Q4 ...                             │
+│   │    └─ AP一覧:                                             │
+│   │         - 新規顧客開拓活動 [WBS][かんばん] ← 直接リンク      │
+│   │         - 既存顧客深耕     [WBS][かんばん]                  │
+│   ├─ ▶ 従業員満足度 [NON_FINANCIAL] Lv2                       │
+│   └─ ▶ 離職率 [METRIC] Lv2                                    │
+│ ▶ 営業利益 [FINANCIAL] Lv1                                    │
+└────────────────────────────────────────────────────────────────┘
+```
+
+#### サマリカード仕様
+
+| カード | データソース | 計算ロジック |
+|--------|-------------|-------------|
+| 総KPI数 | kpi_master_items | COUNT WHERE is_active=true AND hierarchy_level IN (1,2) |
+| 平均達成率 | kpi_fact_amounts, fact_amounts | AVG(actual_value/target_value*100) |
+| 遅延AP数 | action_plans | COUNT WHERE status='DELAYED' |
+| 要注目数 | kpi_master_items + action_plans | 達成率<80% OR AP遅延 のKPI項目数 |
+
+#### AP行からの直接動線
+
+AP行に`[WBS]`と`[かんばん]`ボタンを直接配置し、パネル展開なしでワンクリックで遷移可能。
+
+| ボタン | 遷移先 | パラメータ |
+|--------|--------|-----------|
+| [WBS] | `/wbs/{actionPlanId}` | actionPlanId |
+| [かんばん] | `/kanban/{actionPlanId}` | actionPlanId |
+
 ### エンティティ定義（Data Model 正本）
-- **参照ファイル**: `.kiro/specs/entities/02_KPI管理マスタ.md`
+- **参照ファイル**: `.kiro/specs/仕様概要/KPI管理_エンティティ変更サマリ.md`
 - **対象エンティティ**: kpi_master_events, kpi_master_items, kpi_definitions, kpi_fact_amounts, kpi_target_values, subjects（変更）, metrics（変更）, action_plans（変更）
 
 ### 仕様検討（経緯・背景）※参考
@@ -102,6 +169,7 @@ graph TB
 
 | Method | Endpoint | Purpose | Request DTO (contracts/bff) | Response DTO (contracts/bff) | Notes |
 | ------ | -------- | ------- | --------------------------- | ---------------------------- | ----- |
+| GET | /api/bff/kpi-master/summary | KPIサマリ取得（ダッシュボード用） | GetKpiMasterSummaryQueryDto | KpiMasterSummaryDto | サマリカード4指標 |
 | GET | /api/bff/kpi-master/events | KPI管理イベント一覧取得 | GetKpiMasterEventsQueryDto | KpiMasterEventListDto | ページング・部門フィルタ対応 |
 | GET | /api/bff/kpi-master/events/:id | KPI管理イベント詳細取得 | - | KpiMasterEventDetailDto | KPI項目一覧含む |
 | POST | /api/bff/kpi-master/events | KPI管理イベント作成 | CreateKpiMasterEventDto | KpiMasterEventDto | DRAFT状態で作成 |
@@ -305,8 +373,9 @@ KPI項目の閲覧・編集権限は、以下のロジックで判定する：
 ### Contracts Summary（This Feature）
 
 **BFF Contracts (packages/contracts/src/bff/kpi-master)**
-- DTO: CreateKpiMasterEventDto, KpiMasterEventDto, GetKpiMasterEventsQueryDto, CreateKpiMasterItemDto, KpiMasterItemDto, UpdateKpiMasterItemDto, KpiMasterItemDetailDto, KpiMasterItemTreeDto, CreateKpiDefinitionDto, KpiDefinitionDto, CreateKpiFactAmountDto, UpdateKpiFactAmountDto, KpiFactAmountDto, CreateKpiTargetValueDto, UpdateKpiTargetValueDto, KpiTargetValueDto
-- Query DTO: GetKpiMasterEventsQueryDto (page, pageSize, keyword, fiscalYear, status), GetKpiMasterItemsQueryDto (eventId, departmentStableIds, hierarchyLevel), GetKpiDefinitionsQueryDto (companyId, keyword)
+- DTO: CreateKpiMasterEventDto, KpiMasterEventDto, GetKpiMasterEventsQueryDto, CreateKpiMasterItemDto, KpiMasterItemDto, UpdateKpiMasterItemDto, KpiMasterItemDetailDto, KpiMasterItemTreeDto, CreateKpiDefinitionDto, KpiDefinitionDto, CreateKpiFactAmountDto, UpdateKpiFactAmountDto, KpiFactAmountDto, CreateKpiTargetValueDto, UpdateKpiTargetValueDto, KpiTargetValueDto, **KpiMasterSummaryDto**
+- Query DTO: GetKpiMasterEventsQueryDto (page, pageSize, keyword, fiscalYear, status), GetKpiMasterItemsQueryDto (eventId, departmentStableIds, hierarchyLevel), GetKpiDefinitionsQueryDto (companyId, keyword), **GetKpiMasterSummaryQueryDto (eventId, departmentStableIds)**
+- **Summary DTO**: KpiMasterSummaryDto { totalKpiCount, avgAchievementRate, delayedActionPlanCount, attentionRequiredCount }
 
 **API Contracts (packages/contracts/src/api/kpi-master)**
 - DTO: CreateKpiMasterEventApiDto, KpiMasterEventApiDto, GetKpiMasterEventsApiQueryDto, CreateKpiMasterItemApiDto, KpiMasterItemApiDto, UpdateKpiMasterItemApiDto, CreateKpiDefinitionApiDto, KpiDefinitionApiDto, CreateKpiFactAmountApiDto, KpiFactAmountApiDto, CreateKpiTargetValueApiDto, KpiTargetValueApiDto
@@ -848,10 +917,15 @@ sequenceDiagram
 ```mermaid
 graph TB
     subgraph "apps/web"
-        UI_Master[KPI管理マスタ画面]
-        UI_List[KPI一覧画面]
-        UI_Panel[KPIパネルUI]
+        subgraph "2画面統合型設計"
+            UI_List[KPI一覧画面<br/>メイン・サマリカード付]
+            UI_Master[KPIマスタ設定画面<br/>管理者向け]
+        end
+        UI_Summary[サマリカード<br/>4指標表示]
+        UI_Tree[階層ツリー<br/>パネル展開式]
+        UI_Panel[KPIパネルUI<br/>予実・AP表示]
         UI_Modal[AP追加モーダル]
+        UI_WBS[WBS/かんばんボタン<br/>AP行直接配置]
         MockClient[MockBffClient]
         HttpClient[HttpBffClient]
     end
@@ -890,12 +964,18 @@ graph TB
         DB_ActionPlans[(action_plans)]
     end
 
-    UI_Master --> HttpClient
+    UI_List --> UI_Summary
+    UI_List --> UI_Tree
+    UI_Tree --> UI_Panel
+    UI_Panel --> UI_WBS
+    UI_Panel --> UI_Modal
     UI_List --> HttpClient
+    UI_Master --> HttpClient
+    UI_Summary --> HttpClient
     UI_Panel --> HttpClient
     UI_Modal --> HttpClient
-    MockClient -.-> UI_Master
     MockClient -.-> UI_List
+    MockClient -.-> UI_Master
 
     HttpClient --> BFF_Controller
     BFF_Controller --> BFF_Service
@@ -929,15 +1009,26 @@ graph TB
 ## Phase 1 MVP Scope
 
 ### 実装対象（Phase 1）
-- KPI管理イベント作成・確定（DRAFT/CONFIRMED）
-- KPI項目登録（財務科目・非財務KPI・指標の3種別対応）
-- KPI一覧画面（階層表示、パネル開閉式UI）
+
+#### 画面・UX（2画面統合型設計）
+- **KPI一覧画面**（メイン、ダッシュボード機能統合）
+  - サマリカード4指標表示（総KPI数、達成率、遅延AP数、要注目数）
+  - 階層ツリー表示（Lv1→Lv2の親子構造）
+  - パネル展開式UI（予実データ・AP一覧表示）
+  - AP行に[WBS][かんばん]ボタン直接配置（スマート動線）
+- **KPIマスタ設定画面**（管理者向け）
+  - KPI管理イベント作成・確定（DRAFT/CONFIRMED）
+  - KPI項目登録（財務科目・非財務KPI・指標の3種別対応）
+
+#### 機能
 - 財務科目KPI予実表示（read-only、fact_amountsから予算・見込・実績を取得して表示、達成率計算）
 - 非財務KPI目標実績入力（インライン編集、期間追加）
 - 指標目標値管理（期間追加、目標値入力のみ）
 - 部門フィルタ（複数選択、デフォルト全選択）
 - アクションプラン追加（モーダル、kpi_master_item_idで紐付け）
 - 権限制御（epm.kpi.admin/write/read、control_department_stable_ids配列包含チェック）
+
+#### 実装方式
 - MockBffClient → HttpBffClient段階実装
 
 ### 実装対象外（Phase 2へ延期）

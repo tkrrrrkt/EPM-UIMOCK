@@ -47,6 +47,10 @@ import {
   ArrowRightLeft,
   FileUp,
   Presentation,
+  Sparkles,
+  MessageSquare,
+  AlertTriangle,
+  Bot,
   type LucideIcon,
 } from "lucide-react"
 
@@ -479,4 +483,53 @@ export const menu: MenuItem[] = [
     path: "/design-system",
     icon: Palette,
   },
+
+  // AI機能デモ（開発環境のみ）
+  ...(process.env.NODE_ENV === "development"
+    ? [
+        {
+          id: "ai-demo",
+          label: "AI Features Demo",
+          labelJa: "🧪 AI機能デモ (v0)",
+          icon: Sparkles,
+          children: [
+            {
+              id: "nlq-demo",
+              label: "Natural Language Q&A",
+              labelJa: "自然言語Q&A",
+              path: "/_v0_drop/ai/nlq",
+              icon: MessageSquare,
+            },
+            {
+              id: "variance-analysis-demo",
+              label: "Variance Analysis",
+              labelJa: "差異分析レポート",
+              path: "/_v0_drop/ai/variance-analysis",
+              icon: GitCompareArrows,
+            },
+            {
+              id: "graph-generation-demo",
+              label: "Graph Generation",
+              labelJa: "グラフ自動生成",
+              path: "/_v0_drop/ai/graph-generation",
+              icon: LineChart,
+            },
+            {
+              id: "anomaly-detection-demo",
+              label: "Anomaly Detection",
+              labelJa: "異常値検知アラート",
+              path: "/_v0_drop/ai/anomaly-detection",
+              icon: AlertTriangle,
+            },
+            {
+              id: "chat-bot-demo",
+              label: "Executive Bot",
+              labelJa: "経営参謀Bot",
+              path: "/_v0_drop/ai/chat-bot",
+              icon: Bot,
+            },
+          ],
+        },
+      ]
+    : []),
 ]

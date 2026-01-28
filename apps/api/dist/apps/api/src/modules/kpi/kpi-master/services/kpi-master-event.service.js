@@ -12,54 +12,60 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.KpiMasterEventService = void 0;
 const common_1 = require("@nestjs/common");
 const kpi_master_event_repository_1 = require("../repositories/kpi-master-event.repository");
-const kpi_1 = require("../../../../../../../packages/contracts/src/shared/enums/kpi");
 const errors_1 = require("../../../../../../../packages/contracts/src/shared/errors");
 let KpiMasterEventService = class KpiMasterEventService {
-    constructor(eventRepository) {
-        this.eventRepository = eventRepository;
+    constructor(kpiMasterEventRepository) {
+        this.kpiMasterEventRepository = kpiMasterEventRepository;
     }
-    async findAll(tenantId, filters) {
-        return this.eventRepository.findAll(tenantId, filters);
+    async findAllEvents(tenantId, query) {
+        return this.kpiMasterEventRepository.findAll(tenantId, query);
     }
-    async findById(tenantId, id) {
-        const event = await this.eventRepository.findById(tenantId, id);
+    async findEventById(tenantId, id) {
+        const event = await this.kpiMasterEventRepository.findById(tenantId, id);
         if (!event) {
-            throw new errors_1.KpiMasterEventNotFoundError(`KPI event not found: ${id}`);
+            throw new errors_1.KpiMasterEventNotFoundError(`KPI Master Event not found: ${id}`);
         }
         return event;
     }
-    async create(tenantId, data, userId) {
-        const existing = await this.eventRepository.findByEventCode(tenantId, data.companyId, data.eventCode);
-        if (existing) {
-            throw new errors_1.KpiMasterEventDuplicateError(`Event code already exists: ${data.eventCode} in company ${data.companyId}`);
+    async createEvent(tenantId, userId, data) {
+        const existingEvent = await this.kpiMasterEventRepository.findByEventCode(tenantId, data.company_id, data.event_code);
+        if (existingEvent) {
+            throw new errors_1.KpiMasterEventDuplicateError(`Event code already exists: ${data.event_code}`);
         }
-        const event = await this.eventRepository.create(tenantId, data, userId);
+        const event = await this.kpiMasterEventRepository.create(tenantId, {
+            tenant_id: tenantId,
+            company_id: data.company_id,
+            event_code: data.event_code,
+            event_name: data.event_name,
+            fiscal_year: data.fiscal_year,
+            created_by: userId,
+        });
         return event;
     }
-    async update(tenantId, id, data, userId) {
-        const existing = await this.eventRepository.findById(tenantId, id);
-        if (!existing) {
-            throw new errors_1.KpiMasterEventNotFoundError(`KPI event not found: ${id}`);
+    async confirmEvent(tenantId, id, userId) {
+        const event = await this.kpiMasterEventRepository.findById(tenantId, id);
+        if (!event) {
+            throw new errors_1.KpiMasterEventNotFoundError(`KPI Master Event not found: ${id}`);
         }
-        if (data.eventCode && data.eventCode !== existing.eventCode) {
-            const duplicate = await this.eventRepository.findByEventCode(tenantId, data.companyId || existing.companyId, data.eventCode);
-            if (duplicate && duplicate.id !== id) {
-                throw new errors_1.KpiMasterEventDuplicateError(`Event code already exists: ${data.eventCode}`);
-            }
+        if (event.status === 'CONFIRMED') {
+            throw new errors_1.KpiMasterEventAlreadyConfirmedError(`Event already confirmed: ${id}`);
         }
-        const updated = await this.eventRepository.update(tenantId, id, data, userId);
-        return updated;
+        const updatedEvent = await this.kpiMasterEventRepository.update(tenantId, id, {
+            status: 'CONFIRMED',
+            updated_by: userId,
+        });
+        return updatedEvent;
     }
-    async confirm(tenantId, id, userId) {
-        const existing = await this.eventRepository.findById(tenantId, id);
-        if (!existing) {
-            throw new errors_1.KpiMasterEventNotFoundError(`KPI event not found: ${id}`);
+    async updateEvent(tenantId, id, userId, data) {
+        const event = await this.kpiMasterEventRepository.findById(tenantId, id);
+        if (!event) {
+            throw new errors_1.KpiMasterEventNotFoundError(`KPI Master Event not found: ${id}`);
         }
-        if (existing.status !== kpi_1.KpiMasterEventStatus.DRAFT) {
-            throw new errors_1.KpiMasterEventAlreadyConfirmedError(`Cannot confirm event in ${existing.status} status. Only DRAFT events can be confirmed.`);
-        }
-        const updated = await this.eventRepository.update(tenantId, id, { status: kpi_1.KpiMasterEventStatus.CONFIRMED }, userId);
-        return updated;
+        const updatedEvent = await this.kpiMasterEventRepository.update(tenantId, id, {
+            event_name: data.event_name,
+            updated_by: userId,
+        });
+        return updatedEvent;
     }
 };
 exports.KpiMasterEventService = KpiMasterEventService;

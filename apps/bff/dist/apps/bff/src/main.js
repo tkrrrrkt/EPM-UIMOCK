@@ -10,8 +10,9 @@ async function bootstrap() {
         credentials: true,
     });
     const port = process.env.BFF_PORT || 3001;
-    await app.listen(port);
-    console.log(`BFF is running on: http://localhost:${port}`);
+    const host = process.env.BFF_HOST || process.env.HOST || '127.0.0.1';
+    await app.listen(port, host);
+    console.log(`BFF is running on: http://${host}:${port}`);
 }
 bootstrap();
 //# sourceMappingURL=main.js.map

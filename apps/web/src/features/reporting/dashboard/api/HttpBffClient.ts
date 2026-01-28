@@ -20,6 +20,7 @@ import type {
   BffWidgetDataResponseDto,
   BffDashboardSelectorsRequestDto,
   BffDashboardSelectorsResponseDto,
+  BffKpiDefinitionOptionListDto,
   DashboardErrorCode,
 } from '@epm/contracts/bff/dashboard';
 
@@ -196,6 +197,15 @@ export function createHttpBffClient(baseUrl = '/api/bff/reporting/dashboards'): 
         ? `${baseUrl}/selectors?${params}`
         : `${baseUrl}/selectors`;
       return fetchJson<BffDashboardSelectorsResponseDto>(url);
+    },
+
+    /**
+     * Get KPI definition selectors
+     */
+    async getKpiDefinitions(): Promise<BffKpiDefinitionOptionListDto> {
+      return fetchJson<BffKpiDefinitionOptionListDto>(
+        `${baseUrl}/selectors/kpi-definitions`
+      );
     },
 
     /**

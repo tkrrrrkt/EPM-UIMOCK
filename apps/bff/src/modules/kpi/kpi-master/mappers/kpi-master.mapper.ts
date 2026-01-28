@@ -1,211 +1,395 @@
-import {
-  KpiMasterEventDto,
-  KpiMasterItemDto,
-  KpiMasterItemDetailDto,
-  PeriodFactDto,
-  ActionPlanSummaryDto,
-} from '@epm-sdd/contracts/bff/kpi-master';
-import {
-  KpiMasterEventApiDto,
-  KpiMasterItemApiDto,
-  KpiFactAmountApiDto,
-  KpiTargetValueApiDto,
-} from '@epm-sdd/contracts/api/kpi-master';
-
 /**
- * KpiMasterMapper
+ * KPI Master BFF Mapper
  *
  * Purpose:
- * - Transform API DTOs to BFF DTOs
+ * - Transform Domain API DTOs (snake_case) to BFF DTOs (camelCase)
+ * - Build hierarchical structures (parent_kpi_item_id → children array)
  * - Calculate achievement rates (actual/target × 100)
- * - Assemble hierarchy (periodFacts object from arrays)
- * - Master data join (departmentName, ownerName)
+ * - Format period data (fact_amounts array → periodMap object)
+ * - Join master data (department_stable_id → departmentName, owner_employee_id → ownerName)
  *
- * BFF Transformation Rules:
- * - Hierarchy assembly: parent_kpi_item_id → children array
- * - Period data structuring: fact_amounts array → periodMap object
- * - Achievement rate calculation: actual/target × 100
- * - Master data join: department_stable_id → departmentName, owner_employee_id → ownerName
+ * Reference: .kiro/specs/kpi/kpi-master/design.md (Task 5.3)
  */
-export const KpiMasterMapper = {
-  /**
-   * Map KpiMasterEventApiDto to KpiMasterEventDto
-   */
-  toKpiMasterEventDto(apiDto: KpiMasterEventApiDto): KpiMasterEventDto {
-    return {
-      id: apiDto.id,
-      companyId: apiDto.companyId,
-      eventCode: apiDto.eventCode,
-      eventName: apiDto.eventName,
-      fiscalYear: apiDto.fiscalYear,
-      status: apiDto.status,
-      isActive: apiDto.isActive,
-      createdAt: apiDto.createdAt,
-      updatedAt: apiDto.updatedAt,
-      createdBy: apiDto.createdBy,
-      updatedBy: apiDto.updatedBy,
-    };
-  },
+import type {
+  KpiMasterEventListDto,
+  KpiMasterEventDto,
+  KpiMasterEventDetailDto,
+  CreateKpiMasterEventDto,
+  KpiMasterItemDto,
+  KpiMasterItemDetailDto,
+  CreateKpiMasterItemDto,
+  UpdateKpiMasterItemDto,
+  SelectableSubjectListDto,
+  SelectableMetricListDto,
+  KpiDefinitionListDto,
+  KpiDefinitionDto,
+  CreateKpiDefinitionDto,
+  CreateKpiFactAmountDto,
+  UpdateKpiFactAmountDto,
+  KpiFactAmountDto,
+  CreateKpiTargetValueDto,
+  UpdateKpiTargetValueDto,
+  KpiTargetValueDto,
+} from '@epm/contracts/bff/kpi-master';
+import type {
+  KpiMasterEventApiDto,
+  CreateKpiMasterEventApiDto,
+  KpiMasterItemApiDto,
+  CreateKpiMasterItemApiDto,
+  UpdateKpiMasterItemApiDto,
+  KpiDefinitionApiDto,
+  CreateKpiDefinitionApiDto,
+  CreateKpiFactAmountApiDto,
+  UpdateKpiFactAmountApiDto,
+  KpiFactAmountApiDto,
+  CreateKpiTargetValueApiDto,
+  UpdateKpiTargetValueApiDto,
+  KpiTargetValueApiDto,
+  SelectableSubjectApiDto,
+  SelectableMetricApiDto,
+} from '@epm/contracts/api/kpi-master';
+
+export class KpiMasterMapper {
+  // =========================================================================
+  // Event Mappers
+  // =========================================================================
 
   /**
-   * Map KpiMasterItemApiDto to KpiMasterItemDto (basic list item)
+   * Transform event list with pagination
    */
-  toKpiMasterItemDto(apiDto: KpiMasterItemApiDto): KpiMasterItemDto {
+  static toEventList(
+    items: KpiMasterEventApiDto[],
+    total: number,
+    page: number,
+    pageSize: number,
+  ): KpiMasterEventListDto {
     return {
-      id: apiDto.id,
-      kpiEventId: apiDto.kpiEventId,
-      parentKpiItemId: apiDto.parentKpiItemId,
-      kpiCode: apiDto.kpiCode,
-      kpiName: apiDto.kpiName,
-      kpiType: apiDto.kpiType,
-      hierarchyLevel: apiDto.hierarchyLevel,
-      refSubjectId: apiDto.refSubjectId,
-      refKpiDefinitionId: apiDto.refKpiDefinitionId,
-      refMetricId: apiDto.refMetricId,
-      departmentStableId: apiDto.departmentStableId,
-      // TODO: Join master data for departmentName
+      items: items.map(this.toEventDto),
+      total,
+      page,
+      pageSize,
+    };
+  }
+
+  /**
+   * Transform single event to DTO
+   */
+  static toEventDto(event: KpiMasterEventApiDto): KpiMasterEventDto {
+    return {
+      id: event.id,
+      eventCode: event.event_code,
+      eventName: event.event_name,
+      fiscalYear: event.fiscal_year,
+      status: event.status,
+      createdAt: event.created_at,
+      updatedAt: event.updated_at,
+    };
+  }
+
+  /**
+   * Transform event to detail DTO
+   */
+  static toEventDetail(event: KpiMasterEventApiDto): KpiMasterEventDetailDto {
+    return {
+      ...this.toEventDto(event),
+      kpiItems: [],
+    };
+  }
+
+  /**
+   * Transform BFF create DTO to API DTO
+   */
+  static toCreateEventApiDto(
+    data: CreateKpiMasterEventDto,
+    companyId: string,
+  ): Omit<CreateKpiMasterEventApiDto, 'tenant_id' | 'created_by'> {
+    return {
+      company_id: companyId,
+      event_code: data.eventCode,
+      event_name: data.eventName,
+      fiscal_year: data.fiscalYear,
+    };
+  }
+
+  // =========================================================================
+  // Item Mappers
+  // =========================================================================
+
+  /**
+   * Transform item list with pagination
+   */
+  static toItemList(
+    items: KpiMasterItemApiDto[],
+  ): KpiMasterItemDto[] {
+    return items.map(this.toItemDto);
+  }
+
+  /**
+   * Transform single item to DTO
+   */
+  static toItemDto(item: KpiMasterItemApiDto): KpiMasterItemDto {
+    return {
+      id: item.id,
+      eventId: item.event_id,
+      kpiCode: item.kpi_code,
+      kpiName: item.kpi_name,
+      kpiType: item.kpi_type,
+      hierarchyLevel: item.hierarchy_level,
+      parentKpiItemId: item.parent_kpi_item_id,
+      departmentStableId: item.department_stable_id,
       departmentName: undefined,
-      ownerEmployeeId: apiDto.ownerEmployeeId,
-      // TODO: Join master data for ownerName
-      ownerName: undefined,
-      sortOrder: apiDto.sortOrder,
-      isActive: apiDto.isActive,
-      createdAt: apiDto.createdAt,
-      updatedAt: apiDto.updatedAt,
+      ownerEmployeeId: item.owner_employee_id,
+      ownerEmployeeName: undefined,
+      unit: item.unit,
+      achievementRate: this.calculateAchievementRate(0, 0), // TODO: Phase 2 - 実績値取得
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
     };
-  },
+  }
 
   /**
-   * Map KpiMasterItemApiDto to KpiMasterItemDetailDto (with period facts and action plans)
-   *
-   * This is the main transformation for detail view:
-   * - Assembles periodFacts from fact amounts and target values
-   * - Calculates achievement rates (actual/target × 100)
-   * - Maps action plans summary
-   *
-   * @param apiDto - KPI item API DTO
-   * @param factAmounts - Fact amounts (non-financial KPI)
-   * @param targetValues - Target values (financial/metric KPI)
-   * @param actionPlans - Action plans linked to this KPI item
+   * Transform item to detail DTO
    */
-  toKpiMasterItemDetailDto(
-    apiDto: KpiMasterItemApiDto,
-    factAmounts: KpiFactAmountApiDto[],
-    targetValues: KpiTargetValueApiDto[],
-    actionPlans: any[], // TODO: Type with ActionPlanApiDto when available
-  ): KpiMasterItemDetailDto {
-    // Base item mapping
-    const baseItem = this.toKpiMasterItemDto(apiDto);
-
-    // Assemble periodFacts from fact amounts and target values
-    const periodFacts = this.assemblePeriodFacts(
-      apiDto.kpiType,
-      factAmounts,
-      targetValues,
-    );
-
-    // Map action plans summary
-    const actionPlansSummary: ActionPlanSummaryDto[] = actionPlans.map((plan) => ({
-      id: plan.id,
-      planCode: plan.planCode,
-      planName: plan.planName,
-      status: plan.status,
-      progress: plan.progress,
-    }));
-
+  static toItemDetail(item: KpiMasterItemApiDto): KpiMasterItemDetailDto {
     return {
-      ...baseItem,
-      periodFacts,
-      actionPlans: actionPlansSummary,
+      ...this.toItemDto(item),
+      // TODO: Phase 2 - 予実データ、目標値データ、階層構造、AP一覧
+      factAmounts: [],
+      actionPlans: [],
     };
-  },
+  }
 
   /**
-   * Assemble period facts from fact amounts and target values
-   *
-   * BFF Transformation:
-   * - Converts array of fact amounts/target values into period-keyed object
-   * - Calculates achievement rate (actual/target × 100)
-   * - Handles three KPI types: FINANCIAL, NON_FINANCIAL, METRIC
-   *
-   * @param kpiType - KPI type (FINANCIAL/NON_FINANCIAL/METRIC)
-   * @param factAmounts - Fact amounts array (for NON_FINANCIAL)
-   * @param targetValues - Target values array (for FINANCIAL/METRIC)
-   * @returns Period-keyed object with facts and achievement rates
+   * Transform BFF create DTO to API DTO
    */
-  assemblePeriodFacts(
-    kpiType: string,
-    factAmounts: KpiFactAmountApiDto[],
-    targetValues: KpiTargetValueApiDto[],
-  ): Record<string, PeriodFactDto> {
-    const periodFacts: Record<string, PeriodFactDto> = {};
-
-    switch (kpiType) {
-      case 'NON_FINANCIAL':
-        // Non-financial KPI: Use fact amounts (manual input)
-        for (const fact of factAmounts) {
-          periodFacts[fact.periodCode] = {
-            periodCode: fact.periodCode,
-            targetValue: fact.targetValue,
-            actualValue: fact.actualValue,
-            achievementRate: this.calculateAchievementRate(
-              fact.actualValue,
-              fact.targetValue,
-            ),
-            notes: fact.notes,
-          };
-        }
-        break;
-
-      case 'FINANCIAL':
-      case 'METRIC':
-        // Financial/Metric KPI: Use target values + actual values from other sources
-        // TODO: For FINANCIAL, fetch actual values from fact_amounts table (subject-based)
-        // TODO: For METRIC, calculate actual values from metric formulas (Phase 2)
-        for (const target of targetValues) {
-          periodFacts[target.periodCode] = {
-            periodCode: target.periodCode,
-            targetValue: target.targetValue,
-            actualValue: undefined, // TODO: Fetch/calculate actual values
-            achievementRate: undefined, // Cannot calculate without actual
-            notes: undefined,
-          };
-        }
-        break;
-
-      default:
-        // Unknown KPI type, return empty
-        break;
-    }
-
-    return periodFacts;
-  },
+  static toCreateItemApiDto(
+    data: CreateKpiMasterItemDto,
+    companyId: string,
+  ): Omit<CreateKpiMasterItemApiDto, 'tenant_id' | 'created_by'> {
+    return {
+      company_id: companyId,
+      event_id: data.eventId,
+      kpi_code: data.kpiCode,
+      kpi_name: data.kpiName,
+      kpi_type: data.kpiType,
+      hierarchy_level: data.hierarchyLevel,
+      parent_kpi_item_id: data.parentKpiItemId,
+      ref_subject_id: data.refSubjectId,
+      ref_kpi_definition_id: data.refKpiDefinitionId,
+      ref_metric_id: data.refMetricId,
+      department_stable_id: data.departmentStableId,
+      owner_employee_id: data.ownerEmployeeId,
+      unit: data.unit,
+    };
+  }
 
   /**
-   * Calculate achievement rate (actual/target × 100)
-   *
-   * BFF Responsibility:
-   * - Achievement rate is NOT stored in database
-   * - Calculated on-the-fly in BFF layer for UI display
-   * - Returns undefined if either value is missing
-   * - Rounds to 1 decimal place
-   *
-   * @param actualValue - Actual value
-   * @param targetValue - Target value
-   * @returns Achievement rate percentage (0-100+) or undefined
+   * Transform BFF update DTO to API DTO
    */
-  calculateAchievementRate(
-    actualValue: number | undefined,
-    targetValue: number | undefined,
+  static toUpdateItemApiDto(data: UpdateKpiMasterItemDto): Omit<UpdateKpiMasterItemApiDto, 'updated_by'> {
+    return {
+      kpi_name: data.kpiName,
+      department_stable_id: data.departmentStableId,
+      owner_employee_id: data.ownerEmployeeId,
+      unit: data.unit,
+    };
+  }
+
+  /**
+   * Transform selectable subjects to list DTO
+   */
+  static toSelectableSubjectList(subjects: SelectableSubjectApiDto[]): SelectableSubjectListDto {
+    return {
+      subjects: subjects.map((s) => ({
+        id: s.id,
+        subjectCode: s.subject_code,
+        subjectName: s.subject_name,
+        subjectType: s.subject_type,
+      })),
+    };
+  }
+
+  /**
+   * Transform selectable metrics to list DTO
+   */
+  static toSelectableMetricList(metrics: SelectableMetricApiDto[]): SelectableMetricListDto {
+    return {
+      metrics: metrics.map((m) => ({
+        id: m.id,
+        metricCode: m.metric_code,
+        metricName: m.metric_name,
+        formula: m.formula,
+      })),
+    };
+  }
+
+  // =========================================================================
+  // KPI Definition Mappers
+  // =========================================================================
+
+  /**
+   * Transform KPI definition list with pagination
+   */
+  static toDefinitionList(
+    items: KpiDefinitionApiDto[],
+    total: number,
+    page: number,
+    pageSize: number,
+  ): KpiDefinitionListDto {
+    return {
+      items: items.map(this.toDefinitionDto),
+      total,
+      page,
+      pageSize,
+    };
+  }
+
+  /**
+   * Transform single KPI definition to DTO
+   */
+  static toDefinitionDto(definition: KpiDefinitionApiDto): KpiDefinitionDto {
+    return {
+      id: definition.id,
+      kpiCode: definition.kpi_code,
+      kpiName: definition.kpi_name,
+      description: definition.description,
+      unit: definition.unit,
+      aggregationMethod: definition.aggregation_method,
+      direction: definition.direction,
+      createdAt: definition.created_at,
+      updatedAt: definition.updated_at,
+    };
+  }
+
+  /**
+   * Transform BFF create DTO to API DTO
+   */
+  static toCreateDefinitionApiDto(
+    data: CreateKpiDefinitionDto,
+    companyId: string,
+  ): Omit<CreateKpiDefinitionApiDto, 'tenant_id' | 'created_by'> {
+    return {
+      company_id: companyId,
+      kpi_code: data.kpiCode,
+      kpi_name: data.kpiName,
+      description: data.description,
+      unit: data.unit,
+      aggregation_method: data.aggregationMethod,
+      direction: data.direction,
+    };
+  }
+
+  // =========================================================================
+  // Fact Amount Mappers
+  // =========================================================================
+
+  /**
+   * Transform fact amount to DTO
+   */
+  static toFactAmountDto(
+    factAmount: KpiFactAmountApiDto,
+    kpiMasterItemIdOverride?: string,
+  ): KpiFactAmountDto {
+    return {
+      id: factAmount.id,
+      kpiMasterItemId: kpiMasterItemIdOverride || factAmount.kpi_definition_id,
+      periodCode: factAmount.period_code,
+      periodStartDate: factAmount.period_start_date,
+      periodEndDate: factAmount.period_end_date,
+      targetValue: factAmount.target_value,
+      actualValue: factAmount.actual_value,
+      achievementRate: this.calculateAchievementRate(
+        factAmount.actual_value,
+        factAmount.target_value,
+      ),
+      createdAt: factAmount.created_at,
+      updatedAt: factAmount.updated_at,
+    };
+  }
+
+  /**
+   * Transform BFF create DTO to API DTO
+   */
+  static toCreateFactAmountApiDto(
+    data: CreateKpiFactAmountDto,
+    context: { eventId: string; kpiDefinitionId: string },
+  ): Omit<CreateKpiFactAmountApiDto, 'tenant_id' | 'created_by'> {
+    return {
+      event_id: context.eventId,
+      kpi_definition_id: context.kpiDefinitionId,
+      period_code: data.periodCode,
+      period_start_date: data.periodStartDate,
+      period_end_date: data.periodEndDate,
+      target_value: data.targetValue,
+      actual_value: data.actualValue,
+    };
+  }
+
+  /**
+   * Transform BFF update DTO to API DTO
+   */
+  static toUpdateFactAmountApiDto(data: UpdateKpiFactAmountDto): Omit<UpdateKpiFactAmountApiDto, 'updated_by'> {
+    return {
+      target_value: data.targetValue,
+      actual_value: data.actualValue,
+    };
+  }
+
+  // =========================================================================
+  // Target Value Mappers
+  // =========================================================================
+
+  /**
+   * Transform target value to DTO
+   */
+  static toTargetValueDto(targetValue: KpiTargetValueApiDto): KpiTargetValueDto {
+    return {
+      id: targetValue.id,
+      kpiMasterItemId: targetValue.kpi_master_item_id,
+      periodCode: targetValue.period_code,
+      targetValue: targetValue.target_value,
+      createdAt: targetValue.created_at,
+      updatedAt: targetValue.updated_at,
+    };
+  }
+
+  /**
+   * Transform BFF create DTO to API DTO
+   */
+  static toCreateTargetValueApiDto(data: CreateKpiTargetValueDto): Omit<CreateKpiTargetValueApiDto, 'tenant_id'> {
+    return {
+      kpi_master_item_id: data.kpiMasterItemId,
+      period_code: data.periodCode,
+      target_value: data.targetValue,
+    };
+  }
+
+  /**
+   * Transform BFF update DTO to API DTO
+   */
+  static toUpdateTargetValueApiDto(data: UpdateKpiTargetValueDto): UpdateKpiTargetValueApiDto {
+    return {
+      target_value: data.targetValue,
+    };
+  }
+
+  // =========================================================================
+  // Helper Functions
+  // =========================================================================
+
+  /**
+   * Calculate achievement rate
+   * @param actual 実績値
+   * @param target 目標値
+   * @returns Achievement rate (0-100, 1 decimal place)
+   */
+  private static calculateAchievementRate(
+    actual: number | null | undefined,
+    target: number | null | undefined,
   ): number | undefined {
-    if (actualValue === undefined || targetValue === undefined || targetValue === 0) {
+    if (actual == null || target == null || target === 0) {
       return undefined;
     }
-
-    // Calculate: (actual / target) × 100
-    const rate = (actualValue / targetValue) * 100;
-
-    // Round to 1 decimal place
-    return Math.round(rate * 10) / 10;
-  },
-};
+    return Math.round((actual / target) * 1000) / 10; // 小数第1位まで
+  }
+}

@@ -1,200 +1,137 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
+import React from 'react'
+import { useState } from 'react'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/shared/ui/dialog';
-import { Button } from '@/shared/ui/button';
-import { Input } from '@/shared/ui/input';
-import { Label } from '@/shared/ui/label';
-import { Textarea } from '@/shared/ui/textarea';
-import { Calendar } from '@/shared/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
-import { CalendarIcon, ExternalLink } from 'lucide-react';
-import { format } from 'date-fns';
-import { ja } from 'date-fns/locale';
+  DialogFooter,
+  Button,
+  Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/shared/ui'
+import type { BffDepartment, BffEmployee } from '../../lib/types'
 
 interface AddActionPlanDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  kpiMasterItemId: string;
-  kpiItemName: string;
-  onActionPlanCreated: () => void;
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSubmit: (data: {
+    planName: string
+    departmentStableId?: string
+    ownerEmployeeId?: string
+    dueDate?: string
+  }) => void
+  departments: BffDepartment[]
+  employees: BffEmployee[]
 }
 
 export function AddActionPlanDialog({
   open,
   onOpenChange,
-  kpiMasterItemId,
-  kpiItemName,
-  onActionPlanCreated,
+  onSubmit,
+  departments,
+  employees,
 }: AddActionPlanDialogProps) {
-  const [planCode, setPlanCode] = useState('');
-  const [planName, setPlanName] = useState('');
-  const [description, setDescription] = useState('');
-  const [deadline, setDeadline] = useState<Date | undefined>();
-  const [loading, setLoading] = useState(false);
+  const [planName, setPlanName] = useState('')
+  const [departmentStableId, setDepartmentStableId] = useState<string>('')
+  const [ownerEmployeeId, setOwnerEmployeeId] = useState<string>('')
+  const [dueDate, setDueDate] = useState('')
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!planCode || !planName) {
-      alert('必須項目を入力してください');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Mock: Create action plan with kpiMasterItemId
-      // In real implementation, this would call BFF endpoint:
-      // POST /api/bff/action-plan-core/plans
-      // with kpiMasterItemId in the request body
-
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      console.log('Creating action plan:', {
-        planCode,
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (planName.trim()) {
+      onSubmit({
         planName,
-        description,
-        deadline,
-        kpiMasterItemId,
-      });
-
+        departmentStableId: departmentStableId || undefined,
+        ownerEmployeeId: ownerEmployeeId || undefined,
+        dueDate: dueDate || undefined,
+      })
       // Reset form
-      setPlanCode('');
-      setPlanName('');
-      setDescription('');
-      setDeadline(undefined);
-
-      alert(
-        'アクションプランを作成しました。\n\nWBSまたはかんばんボードから詳細を編集できます。',
-      );
-
-      onActionPlanCreated();
-    } catch (error) {
-      console.error('Failed to create action plan:', error);
-      alert('アクションプランの作成に失敗しました');
-    } finally {
-      setLoading(false);
+      setPlanName('')
+      setDepartmentStableId('')
+      setOwnerEmployeeId('')
+      setDueDate('')
+      onOpenChange(false)
     }
-  };
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>アクションプラン追加</DialogTitle>
-          <DialogDescription>
-            KPI「{kpiItemName}」に紐づくアクションプランを作成します
-          </DialogDescription>
         </DialogHeader>
-
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-4 py-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="planName">プラン名</Label>
+            <Input
+              id="planName"
+              placeholder="アクションプラン名を入力"
+              value={planName}
+              onChange={(e) => setPlanName(e.target.value)}
+              required
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="planCode">
-                プランコード <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="planCode"
-                value={planCode}
-                onChange={(e) => setPlanCode(e.target.value)}
-                placeholder="例: AP-2026-001"
-                className="font-mono"
-                maxLength={20}
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                アクションプランを識別するコードを入力してください
-              </p>
+              <Label htmlFor="department">担当部門</Label>
+              <Select value={departmentStableId} onValueChange={setDepartmentStableId}>
+                <SelectTrigger id="department">
+                  <SelectValue placeholder="部門を選択" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map((dept) => (
+                    <SelectItem key={dept.stableId} value={dept.stableId}>
+                      {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="planName">
-                プラン名 <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="planName"
-                value={planName}
-                onChange={(e) => setPlanName(e.target.value)}
-                placeholder="例: 新規顧客開拓施策"
-                maxLength={100}
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                アクションプランの名称を入力してください
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">説明</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="アクションプランの目的や概要を入力してください"
-                rows={4}
-                maxLength={500}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>期限</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {deadline ? (
-                      format(deadline, 'PPP', { locale: ja })
-                    ) : (
-                      <span className="text-muted-foreground">期限を選択</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={deadline}
-                    onSelect={setDeadline}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <p className="text-xs text-muted-foreground">
-                アクションプランの完了予定日を設定してください
-              </p>
-            </div>
-
-            <div className="border-t pt-4">
-              <p className="text-sm text-muted-foreground">
-                作成後、WBSまたはかんばんボードから、タスクやマイルストーンを追加できます。
-              </p>
+              <Label htmlFor="owner">担当者</Label>
+              <Select value={ownerEmployeeId} onValueChange={setOwnerEmployeeId}>
+                <SelectTrigger id="owner">
+                  <SelectValue placeholder="担当者を選択" />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
-
+          <div className="space-y-2">
+            <Label htmlFor="dueDate">期限</Label>
+            <Input
+              id="dueDate"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+          </div>
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={loading}
             >
               キャンセル
             </Button>
-            <Button type="submit" disabled={loading} className="bg-primary">
-              {loading ? '作成中...' : '作成'}
-            </Button>
+            <Button type="submit">追加</Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

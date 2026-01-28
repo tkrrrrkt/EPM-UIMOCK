@@ -22,9 +22,10 @@
       "@/*": ["./src/*"],
       "@contracts/*": ["../../packages/contracts/src/*"],
       "@epm/contracts/*": ["../../packages/contracts/src/*"],
-      "@epm-sdd/contracts/*": ["../../packages/contracts/src/*"]
+      "@epm-sdd/contracts/*": ["../../packages/contracts/src/*"],
+      "@v0/*": ["./_v0_drop/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "_v0_drop"]
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "_v0_drop/**/*.ts", "_v0_drop/**/*.tsx"],
+  "exclude": ["node_modules", "_v0_drop/**"]
 }

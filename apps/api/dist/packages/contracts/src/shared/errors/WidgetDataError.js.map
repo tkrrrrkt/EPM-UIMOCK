@@ -1,0 +1,1 @@
+{"version":3,"file":"WidgetDataError.js","sourceRoot":"","sources":["../../../../../../../../packages/contracts/src/shared/errors/WidgetDataError.ts"],"names":[],"mappings":";;;AAIA,MAAa,eAAgB,SAAQ,KAAK;IACxC,YAAY,UAAkB,gCAAgC;QAC5D,KAAK,CAAC,OAAO,CAAC,CAAC;QACf,IAAI,CAAC,IAAI,GAAG,iBAAiB,CAAC;IAChC,CAAC;CACF;AALD,0CAKC"}

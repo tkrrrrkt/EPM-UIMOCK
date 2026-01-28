@@ -3,7 +3,17 @@
 > **Feature**: kpi/kpi-master
 > **Phase**: Phase 1 MVP
 > **Generated**: 2026-01-25
+> **Updated**: 2026-01-26（ベスト設計：2画面統合型 + サマリカード + スマート動線 反映）
 > **Task Ordering**: Contracts → DB → Domain API → BFF → UI (MockBffClient → HttpBffClient)
+
+---
+
+## 改訂履歴
+
+| 日付 | 変更内容 |
+|------|---------|
+| 2026-01-25 | 初版作成 |
+| 2026-01-26 | ベスト設計反映（2画面統合型、サマリカード、WBS/かんばん直接動線） |
 
 ---
 
@@ -11,8 +21,17 @@
 
 本タスクリストは、KPI管理マスタ機能のPhase 1 MVP実装に必要なすべての作業を記載する。Contracts-first原則に基づき、契約定義から開始し、DB、Domain API、BFF、UIの順に実装を進める。
 
-**Total Tasks**: 7 major tasks, 39 sub-tasks
-**Estimated Effort**: 1-3 hours per sub-task
+### 画面設計（2画面統合型）
+- **KPI一覧** (`/kpi/list`): メイン画面、サマリカード + 階層ツリー + パネル展開式UI
+- **KPIマスタ設定** (`/kpi/master`): 管理者向け、イベント管理 + KPI項目登録
+
+### 主要機能
+- サマリカード（総KPI数、達成率、遅延AP数、要注目数）
+- 階層ツリー（Lv1→Lv2→AP）
+- AP行に[WBS][かんばん]ボタン直接配置（スマート動線）
+- パネル展開式UI（予実表示、インライン編集）
+
+**Total Tasks**: 7 major tasks, 42 sub-tasks
 **Parallelization**: (P)マーカーで並列実行可能タスクを明記
 
 ---
@@ -33,7 +52,7 @@
 
 ## 1. Scaffold / Structure Setup
 
-- [ ] 1.1 (P) Feature骨格生成
+- [x] 1.1 (P) Feature骨格生成
   - 実行: `npx tsx scripts/scaffold-feature.ts kpi kpi-master`
   - 確認事項:
     - `apps/web/src/features/kpi/kpi-master` ディレクトリが作成される
@@ -46,9 +65,9 @@
 
 ## 2. Contracts Definition（最優先・順序厳守）
 
-- [ ] 2. Contracts定義（BFF → API → Shared Enums/Errors）
+- [x] 2. Contracts定義（BFF → API → Shared Enums/Errors）
 
-- [ ] 2.1 (P) Shared Enums定義（packages/contracts/src/shared/enums/kpi）
+- [x] 2.1 (P) Shared Enums定義（packages/contracts/src/shared/enums/kpi）
   - KpiMasterEventStatus enum作成（DRAFT | CONFIRMED）
   - KpiType enum作成（FINANCIAL | NON_FINANCIAL | METRIC）
   - HierarchyLevel enum作成（1 | 2）
@@ -56,7 +75,7 @@
   - Direction enum作成（higher_is_better | lower_is_better）
   - _Requirements: 1, 2, 3_
 
-- [ ] 2.2 (P) Shared Errors定義（packages/contracts/src/shared/errors）
+- [x] 2.2 (P) Shared Errors定義（packages/contracts/src/shared/errors）
   - KpiMasterEventNotFoundError作成
   - KpiMasterEventAlreadyConfirmedError作成
   - KpiMasterItemNotFoundError作成
@@ -70,7 +89,12 @@
   - KpiManagedMetricNotFoundError作成
   - _Requirements: 9, 10, 11_
 
-- [ ] 2.3 BFF Contracts定義（packages/contracts/src/bff/kpi-master）
+- [x] 2.3 BFF Contracts定義（packages/contracts/src/bff/kpi-master）
+  - **【新規】サマリDTO作成（GetKpiMasterSummaryQueryDto, KpiMasterSummaryDto）**
+    - totalKpiCount: number（総KPI数）
+    - avgAchievementRate: number（平均達成率）
+    - delayedActionPlanCount: number（遅延AP数）
+    - attentionRequiredCount: number（要注目数）
   - KPI管理イベント関連DTO作成（CreateKpiMasterEventDto, KpiMasterEventDto, GetKpiMasterEventsQueryDto）
   - KPI項目関連DTO作成（CreateKpiMasterItemDto, UpdateKpiMasterItemDto, KpiMasterItemDto, KpiMasterItemDetailDto, KpiMasterItemTreeDto, GetKpiMasterItemsQueryDto）
   - 選択肢関連DTO作成（SelectableSubjectListDto, SelectableMetricListDto）
@@ -81,7 +105,7 @@
   - camelCase命名規則適用
   - _Requirements: 1, 2, 3, 4, 5, 6, 7, 8, 9_
 
-- [ ] 2.4 API Contracts定義（packages/contracts/src/api/kpi-master）
+- [x] 2.4 API Contracts定義（packages/contracts/src/api/kpi-master）
   - KPI管理イベント関連DTO作成（CreateKpiMasterEventApiDto, KpiMasterEventApiDto, GetKpiMasterEventsApiQueryDto）
   - KPI項目関連DTO作成（CreateKpiMasterItemApiDto, UpdateKpiMasterItemApiDto, KpiMasterItemApiDto, GetKpiMasterItemsApiQueryDto）
   - 非財務KPI定義DTO作成（CreateKpiDefinitionApiDto, KpiDefinitionApiDto）
@@ -91,7 +115,7 @@
   - camelCase命名規則適用
   - _Requirements: 1, 2, 3, 4, 5, 6, 7, 8, 9_
 
-- [ ] 2.5 (P) 既存Action Plan Contracts拡張（packages/contracts/src/bff/action-plan-core、src/api/action-plan-core）
+- [x] 2.5 (P) 既存Action Plan Contracts拡張（packages/contracts/src/bff/action-plan-core、src/api/action-plan-core）
   - CreateActionPlanDto に `kpiMasterItemId?: string` フィールドを追加
   - CreateActionPlanApiDto に `kpiMasterItemId?: string` フィールドを追加
   - subjectId と kpiMasterItemId の排他制約ルールをコメント記載
@@ -101,9 +125,9 @@
 
 ## 3. Database Implementation（Contracts完了後）
 
-- [ ] 3. Database層実装（Prisma Schema → Migration → RLS）
+- [x] 3. Database層実装（Prisma Schema → Migration → RLS）
 
-- [ ] 3.1 Prisma Schema定義（packages/db/prisma/schema.prisma）
+- [x] 3.1 Prisma Schema定義（packages/db/prisma/schema.prisma）
   - kpi_master_events モデル追加（UUID PK、tenant_id、event_code、fiscal_year、status）
   - kpi_master_items モデル追加（kpi_type、hierarchy_level、ref_subject_id/ref_kpi_definition_id/ref_metric_id）
   - kpi_definitions モデル追加（kpi_code、aggregation_method、direction）
@@ -117,7 +141,7 @@
   - Index定義（tenant_id、company_id、event_id、department_stable_id）
   - _Requirements: 1, 2, 3, 4, 5, 6, 7, 8, 11_
 
-- [ ] 3.2 Migration生成・CHECK制約追加（packages/db/prisma/migrations）
+- [x] 3.2 Migration生成・CHECK制約追加（packages/db/prisma/migrations）
   - Prismaマイグレーション生成（`npx prisma migrate dev --name add_kpi_master`）
   - CHECK制約をraw SQLで追加:
     - kpi_master_events.status IN ('DRAFT', 'CONFIRMED')
@@ -131,7 +155,7 @@
   - マイグレーションファイルを実行してDBスキーマを確定
   - _Requirements: 1, 2, 6, 7, 9, 11_
 
-- [ ] 3.3 RLS Policy定義（Migration SQL内）
+- [x] 3.3 RLS Policy定義（Migration SQL内）
   - kpi_master_events テーブルでRLS有効化
   - kpi_master_items テーブルでRLS有効化
   - kpi_definitions テーブルでRLS有効化
@@ -144,9 +168,9 @@
 
 ## 4. Domain API Implementation（DB完了後）
 
-- [ ] 4. Domain API実装（Repository → Service → Controller → 権限チェック → 監査ログ）
+- [x] 4. Domain API実装（Repository → Service → Controller → 権限チェック → 監査ログ）
 
-- [ ] 4.1 KpiMasterEventRepository実装（apps/api/src/modules/kpi/kpi-master）
+- [x] 4.1 KpiMasterEventRepository実装（apps/api/src/modules/kpi/kpi-master）
   - findAll メソッド実装（tenant_id、filters、offset/limit）
   - findById メソッド実装（tenant_id、id）
   - create メソッド実装（tenant_id、data、DRAFT状態で作成）
@@ -156,7 +180,7 @@
   - Prisma set_config前提（RLS有効化確認）
   - _Requirements: 1, 11_
 
-- [ ] 4.2 KpiMasterItemRepository実装（apps/api/src/modules/kpi/kpi-master）
+- [x] 4.2 KpiMasterItemRepository実装（apps/api/src/modules/kpi/kpi-master）
   - findAll メソッド実装（tenant_id、filters、階層取得対応）
   - findById メソッド実装（tenant_id、id、予実データJOIN）
   - create メソッド実装（tenant_id、data、kpi_type別参照ID設定）
@@ -166,7 +190,7 @@
   - WHERE句に必ずtenant_id含める（二重ガード）
   - _Requirements: 2, 3, 4, 9, 11_
 
-- [ ] 4.3 (P) KpiDefinitionRepository実装（apps/api/src/modules/kpi/kpi-master）
+- [x] 4.3 (P) KpiDefinitionRepository実装（apps/api/src/modules/kpi/kpi-master）
   - findAll メソッド実装（tenant_id、filters、offset/limit）
   - findById メソッド実装（tenant_id、id）
   - create メソッド実装（tenant_id、data）
@@ -174,7 +198,7 @@
   - WHERE句に必ずtenant_id含める
   - _Requirements: 2, 6, 11_
 
-- [ ] 4.4 (P) KpiFactAmountRepository実装（apps/api/src/modules/kpi/kpi-master）
+- [x] 4.4 (P) KpiFactAmountRepository実装（apps/api/src/modules/kpi/kpi-master）
   - findByItemId メソッド実装（tenant_id、kpi_definition_id、event_id、期間別取得）
   - create メソッド実装（tenant_id、data）
   - update メソッド実装（tenant_id、id、data）
@@ -182,7 +206,7 @@
   - WHERE句に必ずtenant_id含める
   - _Requirements: 6, 11_
 
-- [ ] 4.5 (P) KpiTargetValueRepository実装（apps/api/src/modules/kpi/kpi-master）
+- [x] 4.5 (P) KpiTargetValueRepository実装（apps/api/src/modules/kpi/kpi-master）
   - findByItemId メソッド実装（tenant_id、kpi_master_item_id、期間別取得）
   - create メソッド実装（tenant_id、data）
   - update メソッド実装（tenant_id、id、data）
@@ -190,7 +214,7 @@
   - WHERE句に必ずtenant_id含める
   - _Requirements: 7, 11_
 
-- [ ] 4.6 KpiMasterEventService実装（apps/api/src/modules/kpi/kpi-master）
+- [x] 4.6 KpiMasterEventService実装（apps/api/src/modules/kpi/kpi-master）
   - createEvent メソッド実装（DRAFT状態で作成、event_code重複チェック）
   - confirmEvent メソッド実装（DRAFT→CONFIRMED遷移、CONFIRMED時は拒否）
   - findAllEvents メソッド実装（filters適用、ページング対応）
@@ -199,7 +223,7 @@
   - エラースロー（KpiMasterEventNotFoundError、KpiMasterEventAlreadyConfirmedError）
   - _Requirements: 1, 11_
 
-- [ ] 4.7 KpiMasterItemService実装（apps/api/src/modules/kpi/kpi-master）
+- [x] 4.7 KpiMasterItemService実装（apps/api/src/modules/kpi/kpi-master）
   - createItem メソッド実装（kpi_type別参照ID検証、kpi_managed=trueチェック）
   - updateItem メソッド実装（kpi_type・参照先変更禁止検証）
   - deleteItem メソッド実装（論理削除、CONFIRMED時は禁止、is_active=false設定）
@@ -214,14 +238,14 @@
   - エラースロー（KpiMasterItemNotFoundError、KpiMasterItemTypeImmutableError、KpiMasterItemDeleteForbiddenError、KpiMasterItemAccessDeniedError、KpiManagedSubjectNotFoundError、KpiManagedMetricNotFoundError）
   - _Requirements: 2, 3, 4, 9, 10, 11_
 
-- [ ] 4.8 (P) KpiDefinitionService実装（apps/api/src/modules/kpi/kpi-master）
+- [x] 4.8 (P) KpiDefinitionService実装（apps/api/src/modules/kpi/kpi-master）
   - createDefinition メソッド実装（kpi_code重複チェック）
   - findAllDefinitions メソッド実装（company_id、keyword検索）
   - 監査ログ記録（created_by）
   - エラースロー（KpiDefinitionDuplicateError）
   - _Requirements: 2, 6, 11_
 
-- [ ] 4.9 (P) KpiFactAmountService実装（apps/api/src/modules/kpi/kpi-master）
+- [x] 4.9 (P) KpiFactAmountService実装（apps/api/src/modules/kpi/kpi-master）
   - createFactAmount メソッド実装（期間重複チェック）
   - updateFactAmount メソッド実装（target_value、actual_value更新）
   - findByItemId メソッド実装（期間別取得）
@@ -229,7 +253,7 @@
   - エラースロー（KpiFactAmountDuplicateError）
   - _Requirements: 6, 11_
 
-- [ ] 4.10 (P) KpiTargetValueService実装（apps/api/src/modules/kpi/kpi-master）
+- [x] 4.10 (P) KpiTargetValueService実装（apps/api/src/modules/kpi/kpi-master）
   - createTargetValue メソッド実装（期間重複チェック）
   - updateTargetValue メソッド実装（target_value更新）
   - findByItemId メソッド実装（期間別取得）
@@ -237,7 +261,7 @@
   - エラースロー（KpiTargetValueDuplicateError）
   - _Requirements: 7, 11_
 
-- [ ] 4.11 KpiMasterController実装（apps/api/src/modules/kpi/kpi-master）
+- [x] 4.11 KpiMasterController実装（apps/api/src/modules/kpi/kpi-master）
   - KPI管理イベント操作エンドポイント実装:
     - POST /api/kpi-master/events（イベント作成）
     - PATCH /api/kpi-master/events/:id/confirm（イベント確定）
@@ -264,7 +288,7 @@
   - API Contracts（2.4）との整合性確保
   - _Requirements: 1, 2, 3, 4, 5, 6, 7, 9, 11_
 
-- [ ] 4.12 (P) Action Plan Service拡張（apps/api/src/modules/action-plan-core）
+- [x] 4.12 (P) Action Plan Service拡張（apps/api/src/modules/action-plan-core）
   - ActionPlanService の createActionPlan メソッド拡張
   - kpiMasterItemId パラメータ受け取り対応
   - subjectId と kpiMasterItemId の排他制約検証（どちらか1つは必須）
@@ -277,9 +301,11 @@
 
 ## 5. BFF Implementation（Domain API完了後）
 
-- [ ] 5. BFF実装（Controller → Service → Mapper → Paging/Sorting正規化）
+- [x] 5. BFF実装（Controller → Service → Mapper → Paging/Sorting正規化）
 
-- [ ] 5.1 KpiMasterController実装（apps/bff/src/modules/kpi/kpi-master）
+- [x] 5.1 KpiMasterController実装（apps/bff/src/modules/kpi/kpi-master）
+  - **【新規】サマリエンドポイント実装:**
+    - GET /api/bff/kpi-master/summary（サマリカード用4指標取得）
   - KPI管理イベント操作エンドポイント実装:
     - GET /api/bff/kpi-master/events（イベント一覧）
     - GET /api/bff/kpi-master/events/:id（イベント詳細）
@@ -305,7 +331,7 @@
   - BFF Contracts（2.3）との整合性確保
   - _Requirements: 1, 2, 3, 4, 5, 6, 7, 9_
 
-- [ ] 5.2 KpiMasterService実装（apps/bff/src/modules/kpi/kpi-master）
+- [x] 5.2 KpiMasterService実装（apps/bff/src/modules/kpi/kpi-master）
   - Paging/Sorting正規化実装:
     - defaults設定（page=1、pageSize=50、sortBy="eventCode"、sortOrder="asc"）
     - clamp実装（pageSize <= 200）
@@ -316,7 +342,7 @@
   - Error Pass-through実装（Domain APIのエラーをそのまま返す）
   - _Requirements: 1, 2, 3, 4, 5, 6, 7, 9_
 
-- [ ] 5.3 BFF Mapper実装（API DTO → BFF DTO変換）
+- [x] 5.3 BFF Mapper実装（API DTO → BFF DTO変換）
   - 階層構造組み立て（parent_kpi_item_id → children配列）
   - 予実データ期間別整形（fact_amounts配列 → periodMapオブジェクト）
   - 達成率計算実装（actual/target × 100、小数第1位まで）
@@ -325,7 +351,7 @@
   - camelCase命名規則適用（DB snake_case → DTO camelCase）
   - _Requirements: 3, 4, 5, 6, 7_
 
-- [ ] 5.4 (P) Action Plan BFF Controller拡張（apps/bff/src/modules/action-plan-core）
+- [x] 5.4 (P) Action Plan BFF Controller拡張（apps/bff/src/modules/action-plan-core）
   - POST /api/bff/action-plan-core/plans エンドポイント拡張
   - CreateActionPlanDto（BFF）の kpiMasterItemId フィールド対応
   - Domain API CreateActionPlanApiDto へのマッピング追加
@@ -336,16 +362,26 @@
 
 ## 6. UI Implementation（MockBffClient → HttpBffClient段階実装）
 
-- [ ] 6. UI実装（v0 Mock → Migration → 本番BFF接続）
+- [x] 6. UI実装（v0 Mock → Migration → 本番BFF接続）
 
-- [ ] 6.1 MockBffClient実装（apps/web/src/features/kpi/kpi-master/api）
+### 6.0 画面構成（2画面統合型設計）
+
+| 画面名 | ルート | 役割 |
+|--------|--------|------|
+| KPI一覧 | `/kpi/list` | メイン画面：サマリカード + 階層ツリー + パネル展開 |
+| KPIマスタ設定 | `/kpi/master` | 管理者向け：イベント管理 + KPI項目登録 |
+
+---
+
+- [x] 6.1 MockBffClient実装（apps/web/src/features/kpi/kpi-master/api）
   - BffClient interface定義（全メソッドシグネチャ）
   - MockBffClient実装（サンプルデータ返却）:
+    - **【新規】getSummary メソッド（サマリカード4指標）**
     - getEvents メソッド（KPI管理イベント一覧、DRAFT/CONFIRMED混在データ）
     - getEventById メソッド（イベント詳細、KPI項目5件含む）
     - createEvent メソッド（サンプルイベント返却）
     - confirmEvent メソッド（status更新）
-    - getItems メソッド（階層構造データ、Level 1/2混在）
+    - getItems メソッド（階層構造データ、Level 1/2混在、**AP含む**）
     - getItemById メソッド（KPI項目詳細、予実データ3期間分、AP 2件）
     - createItem、updateItem、deleteItem メソッド
     - getSelectableSubjects メソッド（kpi_managed=true の科目5件）
@@ -356,7 +392,8 @@
   - サンプルデータは財務・非財務・指標の3種別を含む
   - _Requirements: 1, 2, 3, 4, 5, 6, 7, 8, 9_
 
-- [ ] 6.2 KPI管理マスタ画面実装（v0統制テスト、apps/web/_v0_drop/kpi/kpi-master/src）
+- [x] 6.2 KPIマスタ設定画面実装（管理者向け、apps/web/src/features/kpi/kpi-master）
+  - **ルート**: `/kpi/master`
   - KPI管理イベント一覧表示（Table形式、fiscal_year/event_name/status）
   - 新規イベント作成フォーム（fiscal_year、event_code、event_name入力）
   - イベント確定ボタン実装（DRAFT→CONFIRMED）
@@ -366,20 +403,44 @@
   - 指標選択UI（kpi_managed=trueの指標一覧、Select形式）
   - KPI基本情報入力（kpi_code、kpi_name、hierarchy_level、department、owner）
   - MockBffClient使用（BFF未接続）
-  - _Requirements: 1, 2_
+  - _Requirements: 5, 6_
 
-- [ ] 6.3 KPI一覧画面実装（パネル開閉式UI、v0統制テスト、apps/web/_v0_drop/kpi/kpi-master/src）
-  - 階層表示実装（Accordion/Collapsible使用、Level 1 → Level 2 → Level 3ツリー）
+- [x] 6.3 KPI一覧画面実装（メイン画面、apps/web/src/features/kpi/kpi-master）
+  - **ルート**: `/kpi/list`
+  - **【新規】サマリカードコンポーネント実装**:
+    - 4枚のカード（総KPI数、達成率、遅延AP数、要注目数）
+    - 画面上部に横並び配置
+    - getSummary API呼び出し
+  - **階層ツリー表示実装（Lv1→Lv2→AP）**:
+    - Accordion/Collapsible使用
+    - KPI行: 名前、種別バッジ、部門、達成率（色分け）
+    - **AP行: プラン名、担当者、期限、進捗率、[WBS]ボタン、[かんばん]ボタン**
   - 部門フィルタUI実装（Checkbox複数選択、デフォルト全選択）
+  - 年度選択ドロップダウン
+  - MockBffClient使用
+  - _Requirements: 1, 2, 3, 9_
+
+- [ ] 6.3.1 【新規】WBS/かんばんボタン実装（スマート動線）
+  - AP行に[WBS]ボタン直接配置
+    - アイコン: GanttChart（lucide-react）
+    - クリック時: `/kpi/wbs/{actionPlanId}` へ遷移
+  - AP行に[かんばん]ボタン直接配置
+    - アイコン: KanbanSquare（lucide-react）
+    - クリック時: `/kpi/kanban/{actionPlanId}` へ遷移
+  - ボタンスタイル: `variant="outline" size="sm"`
+  - パネル展開なしで操作可能
+  - _Requirements: 3_
+
+- [x] 6.4 KPIパネル展開・予実表示実装（apps/web/src/features/kpi/kpi-master）
   - KPIパネル実装（クリックで開閉、予実表示エリア）
   - 財務科目KPI予実表示（月次12期間、予算/見込/実績カラム、達成率カラム）
   - 非財務KPI予実表示（期間動的、目標/実績カラム、達成率カラム）
   - 指標KPI目標値表示（期間動的、目標カラム、実績は「自動計算（Phase 2）」表示）
   - アクションプラン一覧表示（パネル内、プラン名/担当者/期限/進捗率）
   - MockBffClient使用
-  - _Requirements: 3, 4, 5, 7_
+  - _Requirements: 4, 7_
 
-- [ ] 6.4 非財務KPI予実インライン編集実装（v0統制テスト、apps/web/_v0_drop/kpi/kpi-master/src）
+- [x] 6.5 非財務KPI予実インライン編集実装（apps/web/src/features/kpi/kpi-master）
   - セルクリック→編集モード切替
   - 目標値・実績値入力フォーム（Decimal型、0以上）
   - 保存ボタンクリック→updateFactAmount呼び出し
@@ -388,44 +449,45 @@
   - フリーテキスト入力対応（カスタム期間）
   - 期間開始日・終了日入力（Optional）
   - MockBffClient使用
-  - _Requirements: 6_
+  - _Requirements: 7_
 
-- [ ] 6.5 アクションプラン追加モーダル実装（v0統制テスト、apps/web/_v0_drop/kpi/kpi-master/src）
-  - モーダル表示（KPIパネル内のAP追加ボタンクリック）
+- [x] 6.6 アクションプラン追加モーダル実装（apps/web/src/features/kpi/kpi-master）
+  - モーダル表示（KPIパネル内の[AP追加]ボタンクリック）
   - AP基本情報入力フォーム（plan_name、department、owner、deadline）
   - kpiMasterItemId自動設定（親KPI項目IDを渡す）
   - 既存 /api/bff/action-plan-core/plans エンドポイント呼び出し（kpiMasterItemId指定）
-  - WBSボタン・かんばんボタン実装（画面遷移、URLパラメータにaction_plan_id）
   - MockBffClient使用
   - _Requirements: 8_
 
-- [ ] 6.6 v0統制テスト・検証（apps/web/_v0_drop/kpi/kpi-master）
+- [ ] 6.7 動作検証（MockBffClient）
   - MockBffClientで全画面動作確認
+  - **サマリカード表示確認（4指標正常表示）**
   - KPI種別（財務/非財務/指標）の切り替え動作確認
-  - 階層表示（Level 1/2/3）の開閉動作確認
+  - 階層表示（Level 1/2 → AP）の開閉動作確認
+  - **AP行の[WBS][かんばん]ボタン動作確認**
   - インライン編集（セル編集・保存・キャンセル）動作確認
   - 部門フィルタ（複数選択・解除）動作確認
   - APモーダル（表示・登録・キャンセル）動作確認
   - エラーハンドリング（重複エラー、権限エラー）UI表示確認
-  - _v0_drop配下のコードが apps/web/src を参照していないことを確認
-  - layout.tsx が存在しないことを確認（AppShell以外の殻禁止）
+  - packages/contracts/src/bff/kpi-master のみ参照（API参照禁止確認）
   - _Requirements: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10_
 
-- [ ] 6.7 UI Migration（v0_drop → src/features）
-  - v0統制テスト合格後、apps/web/src/features/kpi/kpi-master へ移植
-  - MockBffClient → HttpBffClient 差し替え
-  - packages/contracts/src/bff/kpi-master のみ参照（packages/contracts/src/api参照禁止確認）
-  - BFF未実装時点では一時的にMockBffClientを使用可能（段階的移行）
-  - メニュー登録（menu.ts、既存タスクで完了済み）
-  - _Requirements: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10_
-
-- [ ] 6.8 HttpBffClient実装（apps/web/src/features/kpi/kpi-master/api）
+- [x] 6.8 HttpBffClient実装（apps/web/src/features/kpi/kpi-master/api）
   - BffClient interface実装（全メソッド）
+  - **【新規】getSummary メソッド実装（/api/bff/kpi-master/summary）**
   - fetch API使用（/api/bff/kpi-master/*エンドポイント呼び出し）
   - tenant_id/user_idはBFF側で解決（UIからヘッダー送信不要）
   - Error handling実装（BFFからのエラーレスポンス→UI表示）
   - BFF Contracts（2.3）との整合性確保
   - _Requirements: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10_
+
+- [ ] 6.9 ルーティング設定（apps/web/src/app/kpi）
+  - `/kpi/list` → KPI一覧画面（メイン）
+  - `/kpi/master` → KPIマスタ設定画面（管理者）
+  - `/kpi/wbs/[actionPlanId]` → WBS画面（既存機能へリダイレクト or 実装）
+  - `/kpi/kanban/[actionPlanId]` → かんばん画面（既存機能へリダイレクト or 実装）
+  - メニュー登録（menu.ts）
+  - _Requirements: 3_
 
 ---
 
@@ -488,21 +550,29 @@
 
 ## Requirements Coverage Matrix
 
-| 要件ID | 対応タスク |
-|--------|-----------|
-| Req 1 | 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 4.1, 4.6, 4.11, 5.1, 5.2, 6.1, 6.2, 6.7, 6.8, 7.2, 7.5 |
-| Req 2 | 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 4.2, 4.3, 4.7, 4.8, 4.11, 5.1, 5.2, 6.1, 6.2, 6.7, 6.8, 7.2, 7.5 |
-| Req 3 | 2.1, 2.3, 2.4, 3.1, 4.2, 4.7, 4.11, 5.1, 5.2, 5.3, 6.1, 6.3, 6.7, 6.8, 7.2 |
-| Req 4 | 2.3, 2.4, 3.1, 4.2, 4.7, 4.11, 5.1, 5.2, 5.3, 6.1, 6.3, 6.6, 6.7, 6.8, 7.2 |
-| Req 5 | 2.3, 2.4, 3.1, 5.1, 5.2, 5.3, 6.1, 6.3, 6.7, 6.8, 7.2 |
-| Req 6 | 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 4.3, 4.4, 4.8, 4.9, 4.11, 5.1, 5.2, 5.3, 6.1, 6.3, 6.4, 6.6, 6.7, 6.8, 7.2, 7.5 |
-| Req 7 | 2.1, 2.3, 2.4, 3.1, 3.2, 4.5, 4.10, 4.11, 5.1, 5.2, 5.3, 6.1, 6.3, 6.7, 6.8, 7.2, 7.5 |
-| Req 8 | 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 4.11, 4.12, 5.1, 5.4, 6.1, 6.5, 6.6, 6.7, 6.8, 7.2, 7.5 |
-| Req 9 | 2.2, 2.3, 2.4, 3.1, 4.2, 4.7, 4.11, 5.1, 5.2, 6.1, 6.2, 6.7, 6.8, 7.2, 7.5 |
-| Req 10 | 2.2, 3.1, 4.7, 6.6, 6.7, 6.8, 7.3 |
-| Req 11 | 2.2, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10, 4.11, 4.12, 7.1, 7.3, 7.4, 7.6 |
+| 要件ID | 要件名 | 主要対応タスク |
+|--------|--------|---------------|
+| Req 1 | サマリ表示 | 2.3, 5.1, 6.1, 6.3, 6.7, 6.8 |
+| Req 2 | 階層ツリー | 2.3, 4.7, 5.1, 5.3, 6.1, 6.3, 6.7, 6.8 |
+| Req 3 | WBS/かんばん動線 | **6.3.1**, 6.9, 7.2 |
+| Req 4 | パネル展開 | 2.3, 4.7, 5.1, 5.3, 6.4, 6.7, 6.8 |
+| Req 5 | イベント管理 | 2.3, 4.6, 5.1, 6.2, 6.7 |
+| Req 6 | KPI項目登録 | 2.3, 4.7, 4.8, 5.1, 6.2, 6.7 |
+| Req 7 | 非財務KPI予実入力 | 2.3, 4.9, 5.1, 6.4, 6.5, 6.7 |
+| Req 8 | AP追加 | 2.5, 4.12, 5.4, 6.6, 6.7 |
+| Req 9 | 部門フィルタ | 2.3, 4.7, 5.1, 6.3, 6.7 |
+| Req 10 | 権限制御 | 4.7, 6.7, 6.8, 7.3 |
+| Req 11 | マルチテナント・監査 | 3.3, 4.6, 4.7, 4.9, 7.4, 7.6 |
 
 **全11要件すべてカバー済み** ✅
+
+### 新規追加タスク（2026-01-26ベスト設計）
+- **6.3.1**: WBS/かんばんボタン実装（スマート動線）
+- **6.9**: ルーティング設定（2画面統合型対応）
+- **2.3**: サマリDTO追加（KpiMasterSummaryDto）
+- **5.1**: サマリエンドポイント追加（GET /summary）
+- **6.1**: getSummaryメソッド追加（MockBffClient）
+- **6.8**: getSummaryメソッド追加（HttpBffClient）
 
 ---
 

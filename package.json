@@ -6,14 +6,17 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "concurrently -n \"API,BFF,WEB\" -c \"cyan,magenta,green\" \"pnpm dev:api\" \"pnpm dev:bff\" \"pnpm dev:web\"",
     "dev:api": "pnpm --filter @epm/api run start:dev",
     "dev:bff": "pnpm --filter @epm/bff run start:dev",
     "dev:web": "pnpm --filter @epm/web run dev",
+    "build": "pnpm build:api && pnpm build:bff && pnpm build:web",
     "build:api": "pnpm --filter @epm/api run build",
     "build:bff": "pnpm --filter @epm/bff run build",
     "build:web": "pnpm --filter @epm/web run build"
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "dotenv": "^17.2.3",
     "tsx": "^4.21.0",
     "v0-sdk": "^0.15.3"

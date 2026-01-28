@@ -12,108 +12,112 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.KpiFactAmountRepository = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../../../prisma/prisma.service");
-const library_1 = require("@prisma/client/runtime/library");
 let KpiFactAmountRepository = class KpiFactAmountRepository {
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async findByItemId(tenantId, kpiDefinitionId, eventId) {
+    async findByItemId(tenantId, kpiDefinitionId, eventId, departmentStableId) {
         await this.prisma.setTenantContext(tenantId);
+        const where = {
+            tenant_id: tenantId,
+            kpi_definition_id: kpiDefinitionId,
+            kpi_event_id: eventId,
+        };
+        if (departmentStableId) {
+            where.department_stable_id = departmentStableId;
+        }
         const factAmounts = await this.prisma.kpi_fact_amounts.findMany({
-            where: {
-                tenant_id: tenantId,
-                kpi_definition_id: kpiDefinitionId,
-                kpi_event_id: eventId,
-            },
-            orderBy: {
-                period_code: 'asc',
-            },
+            where,
+            orderBy: [{ period_start_date: 'asc' }],
         });
-        return factAmounts.map((fact) => this.mapToApiDto(fact));
+        return factAmounts.map((fa) => this.mapToApiDto(fa));
     }
-    async findById(tenantId, id) {
+    async findByPeriod(tenantId, eventId, kpiDefinitionId, periodCode, departmentStableId) {
         await this.prisma.setTenantContext(tenantId);
+        const where = {
+            tenant_id: tenantId,
+            kpi_event_id: eventId,
+            kpi_definition_id: kpiDefinitionId,
+            period_code: periodCode,
+        };
+        if (departmentStableId) {
+            where.department_stable_id = departmentStableId;
+        }
+        else {
+            where.department_stable_id = null;
+        }
         const factAmount = await this.prisma.kpi_fact_amounts.findFirst({
-            where: {
-                tenant_id: tenantId,
-                id,
-            },
+            where,
         });
         return factAmount ? this.mapToApiDto(factAmount) : null;
     }
-    async create(tenantId, data, userId) {
+    async create(tenantId, data) {
         await this.prisma.setTenantContext(tenantId);
         const factAmount = await this.prisma.kpi_fact_amounts.create({
             data: {
                 tenant_id: tenantId,
-                company_id: data.companyId,
-                kpi_event_id: data.kpiEventId,
-                kpi_definition_id: data.kpiDefinitionId,
-                period_code: data.periodCode,
-                period_start_date: data.periodStartDate ? new Date(data.periodStartDate) : undefined,
-                period_end_date: data.periodEndDate ? new Date(data.periodEndDate) : undefined,
-                target_value: data.targetValue !== undefined ? new library_1.Decimal(data.targetValue) : undefined,
-                actual_value: data.actualValue !== undefined ? new library_1.Decimal(data.actualValue) : undefined,
-                department_stable_id: data.departmentStableId,
+                company_id: data.company_id,
+                kpi_event_id: data.event_id,
+                kpi_definition_id: data.kpi_definition_id,
+                period_code: data.period_code,
+                period_start_date: data.period_start_date
+                    ? new Date(data.period_start_date)
+                    : null,
+                period_end_date: data.period_end_date
+                    ? new Date(data.period_end_date)
+                    : null,
+                target_value: data.target_value,
+                actual_value: data.actual_value,
+                department_stable_id: data.department_stable_id,
                 notes: data.notes,
-                created_by: userId,
-                updated_by: userId,
+                created_by: data.created_by,
+                updated_by: data.created_by,
             },
         });
         return this.mapToApiDto(factAmount);
     }
-    async update(tenantId, id, data, userId) {
+    async update(tenantId, id, data) {
         await this.prisma.setTenantContext(tenantId);
-        const existing = await this.prisma.kpi_fact_amounts.findFirst({
+        const factAmount = await this.prisma.kpi_fact_amounts.update({
             where: {
                 tenant_id: tenantId,
                 id,
             },
-        });
-        if (!existing) {
-            return null;
-        }
-        const factAmount = await this.prisma.kpi_fact_amounts.update({
-            where: { id },
             data: {
-                ...(data.periodStartDate !== undefined && {
-                    period_start_date: data.periodStartDate ? new Date(data.periodStartDate) : null,
-                }),
-                ...(data.periodEndDate !== undefined && {
-                    period_end_date: data.periodEndDate ? new Date(data.periodEndDate) : null,
-                }),
-                ...(data.targetValue !== undefined && {
-                    target_value: data.targetValue !== null ? new library_1.Decimal(data.targetValue) : null,
-                }),
-                ...(data.actualValue !== undefined && {
-                    actual_value: data.actualValue !== null ? new library_1.Decimal(data.actualValue) : null,
-                }),
-                ...(data.departmentStableId !== undefined && {
-                    department_stable_id: data.departmentStableId,
-                }),
-                ...(data.notes !== undefined && { notes: data.notes }),
-                updated_by: userId,
+                target_value: data.target_value,
+                actual_value: data.actual_value,
+                notes: data.notes,
+                updated_by: data.updated_by,
             },
         });
         return this.mapToApiDto(factAmount);
     }
-    mapToApiDto(fact) {
+    mapToApiDto(factAmount) {
         return {
-            id: fact.id,
-            companyId: fact.company_id,
-            kpiEventId: fact.kpi_event_id,
-            kpiDefinitionId: fact.kpi_definition_id,
-            periodCode: fact.period_code,
-            periodStartDate: fact.period_start_date?.toISOString(),
-            periodEndDate: fact.period_end_date?.toISOString(),
-            targetValue: fact.target_value ? parseFloat(fact.target_value.toString()) : undefined,
-            actualValue: fact.actual_value ? parseFloat(fact.actual_value.toString()) : undefined,
-            departmentStableId: fact.department_stable_id || undefined,
-            notes: fact.notes || undefined,
-            createdAt: fact.created_at.toISOString(),
-            updatedAt: fact.updated_at.toISOString(),
-            createdBy: fact.created_by || undefined,
-            updatedBy: fact.updated_by || undefined,
+            id: factAmount.id,
+            tenant_id: factAmount.tenant_id,
+            company_id: factAmount.company_id,
+            event_id: factAmount.kpi_event_id,
+            kpi_definition_id: factAmount.kpi_definition_id,
+            period_code: factAmount.period_code,
+            period_start_date: factAmount.period_start_date
+                ? factAmount.period_start_date.toISOString().split('T')[0]
+                : undefined,
+            period_end_date: factAmount.period_end_date
+                ? factAmount.period_end_date.toISOString().split('T')[0]
+                : undefined,
+            target_value: factAmount.target_value
+                ? parseFloat(factAmount.target_value.toString())
+                : undefined,
+            actual_value: factAmount.actual_value
+                ? parseFloat(factAmount.actual_value.toString())
+                : undefined,
+            department_stable_id: factAmount.department_stable_id,
+            notes: factAmount.notes,
+            created_at: factAmount.created_at.toISOString(),
+            updated_at: factAmount.updated_at.toISOString(),
+            created_by: factAmount.created_by,
+            updated_by: factAmount.updated_by,
         };
     }
 };

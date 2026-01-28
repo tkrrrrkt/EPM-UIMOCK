@@ -1,0 +1,1 @@
+{"version":3,"file":"DashboardNotFoundError.js","sourceRoot":"","sources":["../../../../../../../../packages/contracts/src/shared/errors/DashboardNotFoundError.ts"],"names":[],"mappings":";;;AAIA,MAAa,sBAAuB,SAAQ,KAAK;IAC/C,YAAY,UAAkB,qBAAqB;QACjD,KAAK,CAAC,OAAO,CAAC,CAAC;QACf,IAAI,CAAC,IAAI,GAAG,wBAAwB,CAAC;IACvC,CAAC;CACF;AALD,wDAKC"}

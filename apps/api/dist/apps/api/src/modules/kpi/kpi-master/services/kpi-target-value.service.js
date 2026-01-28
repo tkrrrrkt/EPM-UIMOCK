@@ -14,28 +14,30 @@ const common_1 = require("@nestjs/common");
 const kpi_target_value_repository_1 = require("../repositories/kpi-target-value.repository");
 const errors_1 = require("../../../../../../../packages/contracts/src/shared/errors");
 let KpiTargetValueService = class KpiTargetValueService {
-    constructor(targetValueRepository) {
-        this.targetValueRepository = targetValueRepository;
+    constructor(kpiTargetValueRepository) {
+        this.kpiTargetValueRepository = kpiTargetValueRepository;
     }
     async findByItemId(tenantId, kpiMasterItemId) {
-        return this.targetValueRepository.findByItemId(tenantId, kpiMasterItemId);
+        return this.kpiTargetValueRepository.findByItemId(tenantId, kpiMasterItemId);
     }
-    async create(tenantId, data, userId) {
-        const existing = await this.targetValueRepository.findByItemId(tenantId, data.kpiMasterItemId);
-        const duplicate = existing.find((target) => target.periodCode === data.periodCode);
-        if (duplicate) {
-            throw new errors_1.KpiTargetValueDuplicateError(`Target value already exists for period: ${data.periodCode}`);
+    async createTargetValue(tenantId, data) {
+        const existingTargetValue = await this.kpiTargetValueRepository.findByPeriod(tenantId, data.kpi_master_item_id, data.period_code);
+        if (existingTargetValue) {
+            throw new errors_1.KpiTargetValueDuplicateError(`Target value already exists for period: ${data.period_code}`);
         }
-        const targetValue = await this.targetValueRepository.create(tenantId, data);
+        const targetValue = await this.kpiTargetValueRepository.create(tenantId, {
+            tenant_id: tenantId,
+            kpi_master_item_id: data.kpi_master_item_id,
+            period_code: data.period_code,
+            target_value: data.target_value,
+        });
         return targetValue;
     }
-    async update(tenantId, id, data, userId) {
-        const existing = await this.targetValueRepository.findById(tenantId, id);
-        if (!existing) {
-            throw new errors_1.KpiTargetValueNotFoundError(`Target value not found: ${id}`);
-        }
-        const updated = await this.targetValueRepository.update(tenantId, id, data);
-        return updated;
+    async updateTargetValue(tenantId, id, data) {
+        const targetValue = await this.kpiTargetValueRepository.update(tenantId, id, {
+            target_value: data.target_value,
+        });
+        return targetValue;
     }
 };
 exports.KpiTargetValueService = KpiTargetValueService;

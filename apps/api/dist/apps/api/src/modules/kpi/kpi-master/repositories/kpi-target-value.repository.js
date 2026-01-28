@@ -12,7 +12,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.KpiTargetValueRepository = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../../../prisma/prisma.service");
-const library_1 = require("@prisma/client/runtime/library");
 let KpiTargetValueRepository = class KpiTargetValueRepository {
     constructor(prisma) {
         this.prisma = prisma;
@@ -24,18 +23,17 @@ let KpiTargetValueRepository = class KpiTargetValueRepository {
                 tenant_id: tenantId,
                 kpi_master_item_id: kpiMasterItemId,
             },
-            orderBy: {
-                period_code: 'asc',
-            },
+            orderBy: [{ period_code: 'asc' }],
         });
-        return targetValues.map((target) => this.mapToApiDto(target));
+        return targetValues.map((tv) => this.mapToApiDto(tv));
     }
-    async findById(tenantId, id) {
+    async findByPeriod(tenantId, kpiMasterItemId, periodCode) {
         await this.prisma.setTenantContext(tenantId);
         const targetValue = await this.prisma.kpi_target_values.findFirst({
             where: {
                 tenant_id: tenantId,
-                id,
+                kpi_master_item_id: kpiMasterItemId,
+                period_code: periodCode,
             },
         });
         return targetValue ? this.mapToApiDto(targetValue) : null;
@@ -45,41 +43,35 @@ let KpiTargetValueRepository = class KpiTargetValueRepository {
         const targetValue = await this.prisma.kpi_target_values.create({
             data: {
                 tenant_id: tenantId,
-                kpi_master_item_id: data.kpiMasterItemId,
-                period_code: data.periodCode,
-                target_value: new library_1.Decimal(data.targetValue),
+                kpi_master_item_id: data.kpi_master_item_id,
+                period_code: data.period_code,
+                target_value: data.target_value,
             },
         });
         return this.mapToApiDto(targetValue);
     }
     async update(tenantId, id, data) {
         await this.prisma.setTenantContext(tenantId);
-        const existing = await this.prisma.kpi_target_values.findFirst({
+        const targetValue = await this.prisma.kpi_target_values.update({
             where: {
                 tenant_id: tenantId,
                 id,
             },
-        });
-        if (!existing) {
-            return null;
-        }
-        const targetValue = await this.prisma.kpi_target_values.update({
-            where: { id },
             data: {
-                ...(data.periodCode && { period_code: data.periodCode }),
-                ...(data.targetValue !== undefined && { target_value: new library_1.Decimal(data.targetValue) }),
+                target_value: data.target_value,
             },
         });
         return this.mapToApiDto(targetValue);
     }
-    mapToApiDto(target) {
+    mapToApiDto(targetValue) {
         return {
-            id: target.id,
-            kpiMasterItemId: target.kpi_master_item_id,
-            periodCode: target.period_code,
-            targetValue: parseFloat(target.target_value.toString()),
-            createdAt: target.created_at.toISOString(),
-            updatedAt: target.updated_at.toISOString(),
+            id: targetValue.id,
+            tenant_id: targetValue.tenant_id,
+            kpi_master_item_id: targetValue.kpi_master_item_id,
+            period_code: targetValue.period_code,
+            target_value: parseFloat(targetValue.target_value.toString()),
+            created_at: targetValue.created_at.toISOString(),
+            updated_at: targetValue.updated_at.toISOString(),
         };
     }
 };

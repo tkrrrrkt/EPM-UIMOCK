@@ -85,7 +85,7 @@ export function useApprovalList(options: UseApprovalListOptions = {}): UseApprov
         return prev
       }
       setSortOrder('asc')
-      return column
+      return column as 'departmentName' | 'submittedAt' | 'eventName'
     })
     setPage(1)
   }, [])

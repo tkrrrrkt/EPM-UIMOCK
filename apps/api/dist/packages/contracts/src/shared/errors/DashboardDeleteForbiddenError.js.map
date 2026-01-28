@@ -1,0 +1,1 @@
+{"version":3,"file":"DashboardDeleteForbiddenError.js","sourceRoot":"","sources":["../../../../../../../../packages/contracts/src/shared/errors/DashboardDeleteForbiddenError.ts"],"names":[],"mappings":";;;AAIA,MAAa,6BAA8B,SAAQ,KAAK;IACtD,YAAY,UAAkB,6CAA6C;QACzE,KAAK,CAAC,OAAO,CAAC,CAAC;QACf,IAAI,CAAC,IAAI,GAAG,+BAA+B,CAAC;IAC9C,CAAC;CACF;AALD,sEAKC"}

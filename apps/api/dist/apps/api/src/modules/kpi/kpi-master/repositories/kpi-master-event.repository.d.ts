@@ -1,18 +1,21 @@
 import { PrismaService } from '../../../../prisma/prisma.service';
-import { KpiMasterEventApiDto, CreateKpiMasterEventApiDto, GetKpiMasterEventsApiQueryDto } from '@epm-sdd/contracts/api/kpi-master';
-import { KpiMasterEventStatus } from '@epm-sdd/contracts/shared/enums/kpi';
+import type { KpiMasterEventApiDto, CreateKpiMasterEventApiDto, UpdateKpiMasterEventApiDto, GetKpiMasterEventsApiQueryDto } from '@epm/contracts/api/kpi-master';
 export declare class KpiMasterEventRepository {
     private readonly prisma;
     constructor(prisma: PrismaService);
-    findAll(tenantId: string, filters: GetKpiMasterEventsApiQueryDto): Promise<{
-        data: KpiMasterEventApiDto[];
+    findAll(tenantId: string, query: Omit<GetKpiMasterEventsApiQueryDto, 'tenant_id' | 'company_id'> & {
+        company_id: string;
+    }): Promise<{
+        items: KpiMasterEventApiDto[];
         total: number;
     }>;
     findById(tenantId: string, id: string): Promise<KpiMasterEventApiDto | null>;
     findByEventCode(tenantId: string, companyId: string, eventCode: string): Promise<KpiMasterEventApiDto | null>;
-    create(tenantId: string, data: CreateKpiMasterEventApiDto, userId?: string): Promise<KpiMasterEventApiDto>;
-    update(tenantId: string, id: string, data: Partial<CreateKpiMasterEventApiDto> & {
-        status?: KpiMasterEventStatus;
-    }, userId?: string): Promise<KpiMasterEventApiDto | null>;
+    create(tenantId: string, data: CreateKpiMasterEventApiDto & {
+        created_by?: string;
+    }): Promise<KpiMasterEventApiDto>;
+    update(tenantId: string, id: string, data: UpdateKpiMasterEventApiDto & {
+        updated_by?: string;
+    }): Promise<KpiMasterEventApiDto>;
     private mapToApiDto;
 }

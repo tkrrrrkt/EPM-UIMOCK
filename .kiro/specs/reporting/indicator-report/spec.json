@@ -1,0 +1,21 @@
+{
+  "name": "indicator-report",
+  "context": "reporting",
+  "displayName": "財務指標分析レポート",
+  "description": "財務科目・非財務KPI・指標を混在表示できる定型レポート機能",
+  "version": "1.0.0",
+  "status": "designing",
+  "createdAt": "2026-01-26",
+  "updatedAt": "2026-01-26",
+  "specReferences": {
+    "仕様概要": ".kiro/specs/仕様概要/財務指標分析レポート_財務指標分析レポート.md",
+    "entities": [
+      ".kiro/specs/entities/01_各種マスタ.md",
+      ".kiro/specs/entities/02_トランザクション・残高.md",
+      ".kiro/specs/entities/02_KPI管理マスタ.md"
+    ]
+  },
+  "contracts": {
+    "bff": "packages/contracts/src/bff/indicator-report/index.ts"
+  }
+}

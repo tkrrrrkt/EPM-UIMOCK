@@ -12,50 +12,41 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.KpiMasterEventRepository = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../../../prisma/prisma.service");
-const kpi_1 = require("../../../../../../../packages/contracts/src/shared/enums/kpi");
 let KpiMasterEventRepository = class KpiMasterEventRepository {
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async findAll(tenantId, filters) {
+    async findAll(tenantId, query) {
         await this.prisma.setTenantContext(tenantId);
+        const { company_id, offset = 0, limit = 50, sort_by = 'created_at', sort_order = 'desc', keyword, fiscal_year, status, } = query;
         const where = {
             tenant_id: tenantId,
+            company_id,
             is_active: true,
         };
-        if (filters.keyword) {
+        if (keyword) {
             where.OR = [
-                { event_code: { contains: filters.keyword, mode: 'insensitive' } },
-                { event_name: { contains: filters.keyword, mode: 'insensitive' } },
+                { event_code: { contains: keyword, mode: 'insensitive' } },
+                { event_name: { contains: keyword, mode: 'insensitive' } },
             ];
         }
-        if (filters.fiscalYear !== undefined) {
-            where.fiscal_year = filters.fiscalYear;
+        if (fiscal_year !== undefined) {
+            where.fiscal_year = fiscal_year;
         }
-        if (filters.status) {
-            where.status = filters.status;
+        if (status) {
+            where.status = status;
         }
+        const total = await this.prisma.kpi_master_events.count({ where });
         const orderBy = {};
-        const sortBy = filters.sortBy || 'event_code';
-        const sortOrder = filters.sortOrder || 'asc';
-        const sortByMap = {
-            event_code: 'event_code',
-            event_name: 'event_name',
-            fiscal_year: 'fiscal_year',
-            created_at: 'created_at',
-        };
-        orderBy[sortByMap[sortBy] || 'event_code'] = sortOrder;
-        const [data, total] = await Promise.all([
-            this.prisma.kpi_master_events.findMany({
-                where,
-                orderBy,
-                skip: filters.offset,
-                take: filters.limit,
-            }),
-            this.prisma.kpi_master_events.count({ where }),
-        ]);
+        orderBy[sort_by] = sort_order;
+        const events = await this.prisma.kpi_master_events.findMany({
+            where,
+            orderBy,
+            skip: offset,
+            take: limit,
+        });
         return {
-            data: data.map((event) => this.mapToApiDto(event)),
+            items: events.map((e) => this.mapToApiDto(e)),
             total,
         };
     }
@@ -82,44 +73,34 @@ let KpiMasterEventRepository = class KpiMasterEventRepository {
         });
         return event ? this.mapToApiDto(event) : null;
     }
-    async create(tenantId, data, userId) {
+    async create(tenantId, data) {
         await this.prisma.setTenantContext(tenantId);
         const event = await this.prisma.kpi_master_events.create({
             data: {
                 tenant_id: tenantId,
-                company_id: data.companyId,
-                event_code: data.eventCode,
-                event_name: data.eventName,
-                fiscal_year: data.fiscalYear,
-                status: kpi_1.KpiMasterEventStatus.DRAFT,
+                company_id: data.company_id,
+                event_code: data.event_code,
+                event_name: data.event_name,
+                fiscal_year: data.fiscal_year,
+                status: 'DRAFT',
                 is_active: true,
-                created_by: userId,
-                updated_by: userId,
+                created_by: data.created_by,
+                updated_by: data.created_by,
             },
         });
         return this.mapToApiDto(event);
     }
-    async update(tenantId, id, data, userId) {
+    async update(tenantId, id, data) {
         await this.prisma.setTenantContext(tenantId);
-        const existing = await this.prisma.kpi_master_events.findFirst({
+        const event = await this.prisma.kpi_master_events.update({
             where: {
                 tenant_id: tenantId,
                 id,
-                is_active: true,
             },
-        });
-        if (!existing) {
-            return null;
-        }
-        const event = await this.prisma.kpi_master_events.update({
-            where: { id },
             data: {
-                ...(data.companyId && { company_id: data.companyId }),
-                ...(data.eventCode && { event_code: data.eventCode }),
-                ...(data.eventName && { event_name: data.eventName }),
-                ...(data.fiscalYear && { fiscal_year: data.fiscalYear }),
-                ...(data.status && { status: data.status }),
-                updated_by: userId,
+                event_name: data.event_name,
+                status: data.status,
+                updated_by: data.updated_by,
             },
         });
         return this.mapToApiDto(event);
@@ -127,16 +108,17 @@ let KpiMasterEventRepository = class KpiMasterEventRepository {
     mapToApiDto(event) {
         return {
             id: event.id,
-            companyId: event.company_id,
-            eventCode: event.event_code,
-            eventName: event.event_name,
-            fiscalYear: event.fiscal_year,
+            tenant_id: event.tenant_id,
+            company_id: event.company_id,
+            event_code: event.event_code,
+            event_name: event.event_name,
+            fiscal_year: event.fiscal_year,
             status: event.status,
-            isActive: event.is_active,
-            createdAt: event.created_at.toISOString(),
-            updatedAt: event.updated_at.toISOString(),
-            createdBy: event.created_by || undefined,
-            updatedBy: event.updated_by || undefined,
+            is_active: event.is_active,
+            created_at: event.created_at.toISOString(),
+            updated_at: event.updated_at.toISOString(),
+            created_by: event.created_by,
+            updated_by: event.updated_by,
         };
     }
 };

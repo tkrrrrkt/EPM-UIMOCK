@@ -20,8 +20,6 @@ const kpi_master_item_repository_1 = require("./repositories/kpi-master-item.rep
 const kpi_definition_repository_1 = require("./repositories/kpi-definition.repository");
 const kpi_fact_amount_repository_1 = require("./repositories/kpi-fact-amount.repository");
 const kpi_target_value_repository_1 = require("./repositories/kpi-target-value.repository");
-const subject_repository_1 = require("./repositories/subject.repository");
-const metric_repository_1 = require("./repositories/metric.repository");
 let KpiMasterModule = class KpiMasterModule {
 };
 exports.KpiMasterModule = KpiMasterModule;
@@ -40,8 +38,6 @@ exports.KpiMasterModule = KpiMasterModule = __decorate([
             kpi_definition_repository_1.KpiDefinitionRepository,
             kpi_fact_amount_repository_1.KpiFactAmountRepository,
             kpi_target_value_repository_1.KpiTargetValueRepository,
-            subject_repository_1.SubjectRepository,
-            metric_repository_1.MetricRepository,
         ],
         exports: [
             kpi_master_event_service_1.KpiMasterEventService,
@@ -49,6 +45,11 @@ exports.KpiMasterModule = KpiMasterModule = __decorate([
             kpi_definition_service_1.KpiDefinitionService,
             kpi_fact_amount_service_1.KpiFactAmountService,
             kpi_target_value_service_1.KpiTargetValueService,
+            kpi_master_event_repository_1.KpiMasterEventRepository,
+            kpi_master_item_repository_1.KpiMasterItemRepository,
+            kpi_definition_repository_1.KpiDefinitionRepository,
+            kpi_fact_amount_repository_1.KpiFactAmountRepository,
+            kpi_target_value_repository_1.KpiTargetValueRepository,
         ],
     })
 ], KpiMasterModule);

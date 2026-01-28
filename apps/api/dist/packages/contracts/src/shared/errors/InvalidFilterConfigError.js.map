@@ -1,0 +1,1 @@
+{"version":3,"file":"InvalidFilterConfigError.js","sourceRoot":"","sources":["../../../../../../../../packages/contracts/src/shared/errors/InvalidFilterConfigError.ts"],"names":[],"mappings":";;;AAIA,MAAa,wBAAyB,SAAQ,KAAK;IACjD,YAAY,UAAkB,8BAA8B;QAC1D,KAAK,CAAC,OAAO,CAAC,CAAC;QACf,IAAI,CAAC,IAAI,GAAG,0BAA0B,CAAC;IACzC,CAAC;CACF;AALD,4DAKC"}

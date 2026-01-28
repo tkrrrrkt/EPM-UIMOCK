@@ -20,6 +20,7 @@ model companies {
   tenant_id    String   @db.Uuid
   company_code String   @db.VarChar(50)
   company_name String   @db.VarChar(200)
+  cvp_report_layout_id String? @db.Uuid
   is_active    Boolean  @default(true)
   created_at   DateTime @default(now()) @db.Timestamptz(6)
   updated_at   DateTime @updatedAt @db.Timestamptz(6)
@@ -255,4 +256,55 @@ model action_plans {
   @@unique([tenant_id, plan_code])
   @@index([tenant_id, kpi_master_item_id])
   @@map("action_plans")
+}
+
+// =============================================================================
+// Dashboard Models（経営ダッシュボード）
+// =============================================================================
+
+model dashboards {
+  id                   String    @id @default(uuid()) @db.Uuid
+  tenant_id            String    @db.Uuid
+  name                 String    @db.VarChar(200)
+  description          String?   @db.Text
+  owner_type           String    @db.VarChar(20) // SYSTEM | USER
+  owner_id             String?   @db.Uuid
+  global_filter_config Json      @default("{}")
+  is_active            Boolean   @default(true)
+  sort_order           Int       @default(0)
+  created_at           DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime  @updatedAt @db.Timestamptz(6)
+  created_by           String?   @db.VarChar(100)
+  updated_by           String?   @db.VarChar(100)
+  deleted_at           DateTime? @db.Timestamptz(6) // 論理削除日時（NULL = 未削除）
+  deleted_by           String?   @db.VarChar(100)   // 削除実行者
+
+  // Relations
+  widgets dashboard_widgets[]
+
+  @@unique([tenant_id, id], name: "dashboards_tenant_id_uk")
+  @@index([tenant_id])
+  @@index([tenant_id, owner_type])
+  @@index([tenant_id, deleted_at])
+  @@map("dashboards")
+}
+
+model dashboard_widgets {
+  id             String   @id @default(uuid()) @db.Uuid
+  dashboard_id   String   @db.Uuid
+  widget_type    String   @db.VarChar(50)
+  title          String   @db.VarChar(200)
+  layout         Json     // { row, col, sizeX, sizeY }
+  data_config    Json     // データソース設定
+  filter_config  Json     // { useGlobal: boolean, overrides: {...} }
+  display_config Json     // ウィジェット固有表示設定
+  sort_order     Int      @default(0)
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime @updatedAt @db.Timestamptz(6)
+
+  // Relations
+  dashboard dashboards @relation(fields: [dashboard_id], references: [id], onDelete: Cascade)
+
+  @@index([dashboard_id])
+  @@map("dashboard_widgets")
 }

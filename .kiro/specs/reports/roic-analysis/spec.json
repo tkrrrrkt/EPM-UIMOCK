@@ -1,0 +1,34 @@
+{
+  "feature_name": "reports/roic-analysis",
+  "created_at": "2026-01-27T00:00:00+09:00",
+  "updated_at": "2026-01-27T00:00:00+09:00",
+  "language": "ja",
+  "phase": "ready-for-implementation",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true,
+  "specReferences": {
+    "仕様概要": ".kiro/specs/仕様概要/財務指標分析レポート_ROIC分析.md",
+    "関連仕様": ".kiro/specs/仕様概要/財務指標分析レポート_CVP損益分岐分析.md",
+    "entities": [
+      ".kiro/specs/entities/01_各種マスタ.md",
+      ".kiro/specs/entities/02_トランザクション・残高.md"
+    ]
+  },
+  "contracts": {
+    "bff": "packages/contracts/src/bff/roic-analysis/index.ts"
+  },
+  "notes": "UI/選択項目はCVPと共通。標準モード（BS実績あり）と簡易モード（BS未整備）の2モード対応。"
+}

@@ -14,3 +14,8 @@ export * from './KpiTargetValueNotFoundError';
 export * from './KpiManagedSubjectNotFoundError';
 export * from './KpiManagedMetricNotFoundError';
 export * from './ActionPlanInvalidReferenceError';
+export * from './DashboardNotFoundError';
+export * from './DashboardAccessDeniedError';
+export * from './DashboardDeleteForbiddenError';
+export * from './WidgetDataError';
+export * from './InvalidFilterConfigError';

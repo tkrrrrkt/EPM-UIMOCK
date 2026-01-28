@@ -16,41 +16,31 @@ let KpiDefinitionRepository = class KpiDefinitionRepository {
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async findAll(tenantId, filters) {
+    async findAll(tenantId, query) {
         await this.prisma.setTenantContext(tenantId);
+        const { company_id, offset = 0, limit = 50, sort_by = 'kpi_code', sort_order = 'asc', keyword, } = query;
         const where = {
             tenant_id: tenantId,
+            company_id,
             is_active: true,
         };
-        if (filters.companyId) {
-            where.company_id = filters.companyId;
-        }
-        if (filters.keyword) {
+        if (keyword) {
             where.OR = [
-                { kpi_code: { contains: filters.keyword, mode: 'insensitive' } },
-                { kpi_name: { contains: filters.keyword, mode: 'insensitive' } },
+                { kpi_code: { contains: keyword, mode: 'insensitive' } },
+                { kpi_name: { contains: keyword, mode: 'insensitive' } },
             ];
         }
+        const total = await this.prisma.kpi_definitions.count({ where });
         const orderBy = {};
-        const sortBy = filters.sortBy || 'kpi_code';
-        const sortOrder = filters.sortOrder || 'asc';
-        const sortByMap = {
-            kpi_code: 'kpi_code',
-            kpi_name: 'kpi_name',
-            created_at: 'created_at',
-        };
-        orderBy[sortByMap[sortBy] || 'kpi_code'] = sortOrder;
-        const [data, total] = await Promise.all([
-            this.prisma.kpi_definitions.findMany({
-                where,
-                orderBy,
-                skip: filters.offset,
-                take: filters.limit,
-            }),
-            this.prisma.kpi_definitions.count({ where }),
-        ]);
+        orderBy[sort_by] = sort_order;
+        const definitions = await this.prisma.kpi_definitions.findMany({
+            where,
+            orderBy,
+            skip: offset,
+            take: limit,
+        });
         return {
-            data: data.map((definition) => this.mapToApiDto(definition)),
+            items: definitions.map((d) => this.mapToApiDto(d)),
             total,
         };
     }
@@ -65,7 +55,7 @@ let KpiDefinitionRepository = class KpiDefinitionRepository {
         });
         return definition ? this.mapToApiDto(definition) : null;
     }
-    async findByCode(tenantId, companyId, kpiCode) {
+    async findByKpiCode(tenantId, companyId, kpiCode) {
         await this.prisma.setTenantContext(tenantId);
         const definition = await this.prisma.kpi_definitions.findFirst({
             where: {
@@ -77,21 +67,21 @@ let KpiDefinitionRepository = class KpiDefinitionRepository {
         });
         return definition ? this.mapToApiDto(definition) : null;
     }
-    async create(tenantId, data, userId) {
+    async create(tenantId, data) {
         await this.prisma.setTenantContext(tenantId);
         const definition = await this.prisma.kpi_definitions.create({
             data: {
                 tenant_id: tenantId,
-                company_id: data.companyId,
-                kpi_code: data.kpiCode,
-                kpi_name: data.kpiName,
+                company_id: data.company_id,
+                kpi_code: data.kpi_code,
+                kpi_name: data.kpi_name,
                 description: data.description,
                 unit: data.unit,
-                aggregation_method: data.aggregationMethod,
+                aggregation_method: data.aggregation_method,
                 direction: data.direction,
                 is_active: true,
-                created_by: userId,
-                updated_by: userId,
+                created_by: data.created_by,
+                updated_by: data.created_by,
             },
         });
         return this.mapToApiDto(definition);
@@ -99,18 +89,19 @@ let KpiDefinitionRepository = class KpiDefinitionRepository {
     mapToApiDto(definition) {
         return {
             id: definition.id,
-            companyId: definition.company_id,
-            kpiCode: definition.kpi_code,
-            kpiName: definition.kpi_name,
-            description: definition.description || undefined,
-            unit: definition.unit || undefined,
-            aggregationMethod: definition.aggregation_method,
-            direction: definition.direction || undefined,
-            isActive: definition.is_active,
-            createdAt: definition.created_at.toISOString(),
-            updatedAt: definition.updated_at.toISOString(),
-            createdBy: definition.created_by || undefined,
-            updatedBy: definition.updated_by || undefined,
+            tenant_id: definition.tenant_id,
+            company_id: definition.company_id,
+            kpi_code: definition.kpi_code,
+            kpi_name: definition.kpi_name,
+            description: definition.description,
+            unit: definition.unit,
+            aggregation_method: definition.aggregation_method,
+            direction: definition.direction,
+            is_active: definition.is_active,
+            created_at: definition.created_at.toISOString(),
+            updated_at: definition.updated_at.toISOString(),
+            created_by: definition.created_by,
+            updated_by: definition.updated_by,
         };
     }
 };

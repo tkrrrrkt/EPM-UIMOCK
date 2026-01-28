@@ -18,6 +18,7 @@ import type {
   BffWidgetDataResponseDto,
   BffDashboardSelectorsRequestDto,
   BffDashboardSelectorsResponseDto,
+  BffKpiDefinitionOptionListDto,
 } from '@epm/contracts/bff/dashboard';
 
 /** Query parameters for dashboard list */
@@ -79,6 +80,11 @@ export interface BffClient {
    * Get selectors (fiscal years, plan events, plan versions, departments)
    */
   getSelectors(query?: BffDashboardSelectorsRequestDto): Promise<BffDashboardSelectorsResponseDto>;
+
+  /**
+   * Get KPI definition selectors
+   */
+  getKpiDefinitions(): Promise<BffKpiDefinitionOptionListDto>;
 
   /**
    * Get dashboard templates

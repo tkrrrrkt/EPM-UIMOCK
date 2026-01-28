@@ -1,11 +1,11 @@
 import { PrismaService } from '../../../../prisma/prisma.service';
-import { KpiTargetValueApiDto, CreateKpiTargetValueApiDto } from '@epm-sdd/contracts/api/kpi-master';
+import type { KpiTargetValueApiDto, CreateKpiTargetValueApiDto, UpdateKpiTargetValueApiDto } from '@epm/contracts/api/kpi-master';
 export declare class KpiTargetValueRepository {
     private readonly prisma;
     constructor(prisma: PrismaService);
     findByItemId(tenantId: string, kpiMasterItemId: string): Promise<KpiTargetValueApiDto[]>;
-    findById(tenantId: string, id: string): Promise<KpiTargetValueApiDto | null>;
+    findByPeriod(tenantId: string, kpiMasterItemId: string, periodCode: string): Promise<KpiTargetValueApiDto | null>;
     create(tenantId: string, data: CreateKpiTargetValueApiDto): Promise<KpiTargetValueApiDto>;
-    update(tenantId: string, id: string, data: Partial<CreateKpiTargetValueApiDto>): Promise<KpiTargetValueApiDto | null>;
+    update(tenantId: string, id: string, data: UpdateKpiTargetValueApiDto): Promise<KpiTargetValueApiDto>;
     private mapToApiDto;
 }

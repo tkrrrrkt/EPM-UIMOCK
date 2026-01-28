@@ -1,438 +1,610 @@
-import { Injectable } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
-import { AxiosResponse } from 'axios';
-import { firstValueFrom } from 'rxjs';
-import {
-  GetKpiMasterEventsQueryDto,
-  KpiMasterEventDto,
-  KpiMasterEventListDto,
-  GetKpiMasterItemsQueryDto,
-  KpiMasterItemDto,
-  KpiMasterItemDetailDto,
-  KpiMasterItemListDto,
-  CreateKpiMasterEventDto,
-  CreateKpiMasterItemDto,
-  UpdateKpiMasterItemDto,
-  CreateKpiDefinitionDto,
-  KpiDefinitionDto,
-} from '@epm-sdd/contracts/bff/kpi-master';
-import {
-  GetKpiMasterEventsApiQueryDto,
-  KpiMasterEventApiDto,
-  GetKpiMasterItemsApiQueryDto,
-  KpiMasterItemApiDto,
-  CreateKpiMasterEventApiDto,
-  CreateKpiMasterItemApiDto,
-  UpdateKpiMasterItemApiDto,
-  CreateKpiDefinitionApiDto,
-  KpiDefinitionApiDto,
-} from '@epm-sdd/contracts/api/kpi-master';
-import { KpiMasterMapper } from './mappers/kpi-master.mapper';
-
 /**
- * KpiMasterBffService
+ * KPI Master BFF Service
  *
  * Purpose:
- * - UI requirements optimization (Read Model / ViewModel)
- * - Aggregate and transform Domain API responses (no business rules)
- * - Normalize paging/sorting/filtering parameters
+ * - Call Domain API via HTTP with tenant context
+ * - Apply paging normalization (page/pageSize → offset/limit)
+ * - Transform API responses to BFF DTOs via KpiMasterMapper
  *
- * BFF Responsibilities:
- * - page/pageSize → offset/limit transformation
- * - sortBy whitelist validation
- * - keyword trim, empty → undefined
- * - API DTO ⇄ BFF DTO transformation
- * - Achievement rate calculation (actual/target × 100)
- * - Hierarchy assembly (parent_kpi_item_id → children array)
- * - Period data structuring (fact_amounts array → periodMap object)
- * - Master data join (department_stable_id → departmentName)
- * - Paging info attachment (page/pageSize/totalCount)
+ * Paging Normalization:
+ * - UI/BFF: page / pageSize (page-based)
+ * - Domain API: offset / limit (DB-friendly)
+ * - Defaults: page=1, pageSize=50
+ * - Clamp: pageSize <= 200
+ * - Whitelist: sortBy = eventCode | kpiCode | kpiName | fiscalYear | createdAt
+ *
+ * Reference: .kiro/specs/kpi/kpi-master/design.md (Task 5.2)
  */
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
+import { KpiMasterMapper } from './mappers/kpi-master.mapper';
+import type {
+  KpiMasterSummaryDto,
+  KpiMasterEventListDto,
+  KpiMasterEventDetailDto,
+  CreateKpiMasterEventDto,
+  KpiMasterItemDto,
+  KpiMasterItemDetailDto,
+  CreateKpiMasterItemDto,
+  UpdateKpiMasterItemDto,
+  SelectableSubjectListDto,
+  SelectableMetricListDto,
+  KpiDefinitionListDto,
+  CreateKpiDefinitionDto,
+  CreateKpiFactAmountDto,
+  UpdateKpiFactAmountDto,
+  KpiFactAmountDto,
+  CreateKpiTargetValueDto,
+  UpdateKpiTargetValueDto,
+  KpiTargetValueDto,
+} from '@epm/contracts/bff/kpi-master';
+import type {
+  KpiMasterEventApiDto,
+  KpiMasterItemApiDto,
+  KpiDefinitionApiDto,
+  KpiFactAmountApiDto,
+  KpiTargetValueApiDto,
+} from '@epm/contracts/api/kpi-master';
+
+/** Query params for event list */
+interface GetEventsQuery {
+  page?: number;
+  pageSize?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  keyword?: string;
+  fiscalYear?: number;
+  status?: 'DRAFT' | 'CONFIRMED';
+}
+
+/** Query params for item list */
+interface GetItemsQuery {
+  eventId?: string;
+  kpiType?: 'FINANCIAL' | 'NON_FINANCIAL' | 'METRIC';
+  departmentStableIds?: string[];
+  hierarchyLevel?: 1 | 2;
+}
+
+/** Query params for KPI definition list */
+interface GetKpiDefinitionsQuery {
+  page?: number;
+  pageSize?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  keyword?: string;
+}
+
+/** Allowed sortBy values for events */
+const ALLOWED_EVENT_SORT_BY = ['event_code', 'event_name', 'fiscal_year', 'created_at'] as const;
+
+/** Allowed sortBy values for definitions */
+const ALLOWED_DEFINITION_SORT_BY = ['kpi_code', 'kpi_name', 'created_at'] as const;
+
 @Injectable()
 export class KpiMasterBffService {
   private readonly apiBaseUrl: string;
 
   constructor(private readonly httpService: HttpService) {
-    // TODO: Get from config
+    // Domain API base URL (configurable via environment)
     this.apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:3001';
   }
 
+  // =========================================================================
+  // Paging Normalization
+  // =========================================================================
+
   /**
-   * Get KPI management events list with paging/sorting/filtering
-   *
-   * BFF Normalization:
-   * - Defaults: page=1, pageSize=50, sortBy="eventCode", sortOrder="asc"
-   * - Clamp: pageSize <= 200
-   * - Whitelist: sortBy in ["eventCode", "eventName", "fiscalYear", "createdAt"]
-   * - Normalize: keyword trim, empty → undefined
-   * - Transform: offset=(page-1)*pageSize, limit=pageSize
+   * Normalize event query parameters for Domain API
+   */
+  private normalizeEventQuery(query: GetEventsQuery) {
+    const page = Math.max(1, query.page || 1);
+    const pageSize = Math.min(200, Math.max(1, query.pageSize || 50));
+
+    // Whitelist sortBy
+    const sortBy = ALLOWED_EVENT_SORT_BY.includes(query.sortBy as typeof ALLOWED_EVENT_SORT_BY[number])
+      ? query.sortBy
+      : 'event_code';
+    const sortOrder = query.sortOrder === 'desc' ? 'desc' : 'asc';
+
+    // Normalize keyword (trim, empty→undefined)
+    const keyword = query.keyword?.trim() || undefined;
+
+    return {
+      page,
+      pageSize,
+      offset: (page - 1) * pageSize,
+      limit: pageSize,
+      sortBy,
+      sortOrder,
+      keyword,
+      fiscalYear: query.fiscalYear,
+      status: query.status,
+    };
+  }
+
+  /**
+   * Normalize item query parameters for Domain API
+   */
+  private normalizeItemQuery(query: GetItemsQuery) {
+    return {
+      eventId: query.eventId,
+      kpiType: query.kpiType,
+      departmentStableIds: query.departmentStableIds,
+      hierarchyLevel: query.hierarchyLevel,
+    };
+  }
+
+  /**
+   * Normalize KPI definition query parameters for Domain API
+   */
+  private normalizeDefinitionQuery(query: GetKpiDefinitionsQuery) {
+    const page = Math.max(1, query.page || 1);
+    const pageSize = Math.min(200, Math.max(1, query.pageSize || 50));
+
+    // Whitelist sortBy
+    const sortBy = ALLOWED_DEFINITION_SORT_BY.includes(query.sortBy as typeof ALLOWED_DEFINITION_SORT_BY[number])
+      ? query.sortBy
+      : 'kpi_code';
+    const sortOrder = query.sortOrder === 'desc' ? 'desc' : 'asc';
+
+    // Normalize keyword (trim, empty→undefined)
+    const keyword = query.keyword?.trim() || undefined;
+
+    return {
+      page,
+      pageSize,
+      offset: (page - 1) * pageSize,
+      limit: pageSize,
+      sortBy,
+      sortOrder,
+      keyword,
+    };
+  }
+
+  /**
+   * Create headers for Domain API call
+   */
+  private createHeaders(tenantId: string, userId?: string, companyId?: string) {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'x-tenant-id': tenantId,
+    };
+    if (userId) {
+      headers['x-user-id'] = userId;
+    }
+    if (companyId) {
+      headers['x-company-id'] = companyId;
+    }
+    return headers;
+  }
+
+  // =========================================================================
+  // Summary
+  // =========================================================================
+
+  /**
+   * Get summary (4 metrics for card display)
+   */
+  async getSummary(tenantId: string, eventId?: string): Promise<KpiMasterSummaryDto> {
+    // TODO: Phase 2 - Domain API endpoint implementation
+    // For now, return mock data
+    return {
+      totalKpiCount: 0,
+      avgAchievementRate: 0,
+      delayedActionPlanCount: 0,
+      attentionRequiredCount: 0,
+    };
+  }
+
+  // =========================================================================
+  // KPI管理イベント操作
+  // =========================================================================
+
+  /**
+   * Get events with paging
    */
   async getEvents(
     tenantId: string,
-    query: GetKpiMasterEventsQueryDto,
+    companyId: string,
+    query: GetEventsQuery,
   ): Promise<KpiMasterEventListDto> {
-    // Normalize query parameters
-    const normalized = this.normalizePagingAndSorting(query, {
-      defaultSortBy: 'eventCode',
-      sortByWhitelist: ['eventCode', 'eventName', 'fiscalYear', 'createdAt'],
-      sortByDbMapping: {
-        eventCode: 'event_code',
-        eventName: 'event_name',
-        fiscalYear: 'fiscal_year',
-        createdAt: 'created_at',
-      },
-    });
+    const normalized = this.normalizeEventQuery(query);
 
-    // Build API query
-    const apiQuery: GetKpiMasterEventsApiQueryDto = {
-      offset: normalized.offset,
-      limit: normalized.limit,
-      keyword: normalized.keyword,
-      fiscalYear: query.fiscalYear,
-      status: query.status,
-      sortBy: normalized.sortByDb,
-      sortOrder: normalized.sortOrder,
-    };
-
-    // Call Domain API
-    const response = await this.callDomainApi<{
-      data: KpiMasterEventApiDto[];
-      total: number;
-    }>('GET', '/kpi-master/events', tenantId, { params: apiQuery });
-
-    // Map to BFF DTO
-    const events = response.data.data.map((event: KpiMasterEventApiDto) =>
-      KpiMasterMapper.toKpiMasterEventDto(event),
+    const response = await firstValueFrom(
+      this.httpService.get<{ items: KpiMasterEventApiDto[]; total: number }>(
+        `${this.apiBaseUrl}/api/kpi/kpi-master/events`,
+        {
+          headers: this.createHeaders(tenantId, undefined, companyId),
+          params: {
+            offset: normalized.offset,
+            limit: normalized.limit,
+            sort_by: normalized.sortBy,
+            sort_order: normalized.sortOrder,
+            keyword: normalized.keyword,
+            fiscal_year: normalized.fiscalYear,
+            status: normalized.status,
+          },
+        },
+      ),
     );
 
-    return {
-      events,
-      page: normalized.page,
-      pageSize: normalized.pageSize,
-      totalCount: response.data.total,
-    };
+    const { items, total } = response.data;
+
+    return KpiMasterMapper.toEventList(items, total, normalized.page, normalized.pageSize);
   }
 
   /**
-   * Get KPI management event by ID
+   * Get event by ID
    */
-  async getEventById(tenantId: string, id: string): Promise<KpiMasterEventDto> {
-    const response = await this.callDomainApi<KpiMasterEventApiDto>(
-      'GET',
-      `/kpi-master/events/${id}`,
-      tenantId,
+  async getEvent(tenantId: string, id: string): Promise<KpiMasterEventDetailDto> {
+    const response = await firstValueFrom(
+      this.httpService.get<KpiMasterEventApiDto>(
+        `${this.apiBaseUrl}/api/kpi/kpi-master/events/${id}`,
+        {
+          headers: this.createHeaders(tenantId),
+        },
+      ),
     );
 
-    return KpiMasterMapper.toKpiMasterEventDto(response.data);
+    return KpiMasterMapper.toEventDetail(response.data);
   }
 
   /**
-   * Create KPI management event
+   * Create event
    */
   async createEvent(
     tenantId: string,
+    companyId: string,
     userId: string,
     data: CreateKpiMasterEventDto,
-  ): Promise<KpiMasterEventDto> {
-    const apiData: CreateKpiMasterEventApiDto = {
-      companyId: data.companyId,
-      eventCode: data.eventCode,
-      eventName: data.eventName,
-      fiscalYear: data.fiscalYear,
-    };
-
-    const response = await this.callDomainApi<KpiMasterEventApiDto>(
-      'POST',
-      '/kpi-master/events',
-      tenantId,
-      { data: apiData },
-      userId,
+  ): Promise<KpiMasterEventDetailDto> {
+    const response = await firstValueFrom(
+      this.httpService.post<KpiMasterEventApiDto>(
+        `${this.apiBaseUrl}/api/kpi/kpi-master/events`,
+        KpiMasterMapper.toCreateEventApiDto(data, companyId),
+        {
+          headers: this.createHeaders(tenantId, userId, companyId),
+        },
+      ),
     );
 
-    return KpiMasterMapper.toKpiMasterEventDto(response.data);
+    return KpiMasterMapper.toEventDetail(response.data);
   }
 
   /**
-   * Update KPI management event
+   * Confirm event
    */
-  async updateEvent(
+  async confirmEvent(
     tenantId: string,
     userId: string,
     id: string,
-    data: Partial<CreateKpiMasterEventDto>,
-  ): Promise<KpiMasterEventDto> {
-    const response = await this.callDomainApi<KpiMasterEventApiDto>(
-      'PUT',
-      `/kpi-master/events/${id}`,
-      tenantId,
-      { data },
-      userId,
+  ): Promise<KpiMasterEventDetailDto> {
+    const response = await firstValueFrom(
+      this.httpService.patch<KpiMasterEventApiDto>(
+        `${this.apiBaseUrl}/api/kpi/kpi-master/events/${id}/confirm`,
+        {},
+        {
+          headers: this.createHeaders(tenantId, userId),
+        },
+      ),
     );
 
-    return KpiMasterMapper.toKpiMasterEventDto(response.data);
+    return KpiMasterMapper.toEventDetail(response.data);
   }
 
-  /**
-   * Confirm KPI management event (DRAFT → CONFIRMED)
-   */
-  async confirmEvent(tenantId: string, userId: string, id: string): Promise<KpiMasterEventDto> {
-    const response = await this.callDomainApi<KpiMasterEventApiDto>(
-      'POST',
-      `/kpi-master/events/${id}/confirm`,
-      tenantId,
-      {},
-      userId,
-    );
-
-    return KpiMasterMapper.toKpiMasterEventDto(response.data);
-  }
+  // =========================================================================
+  // KPI項目操作
+  // =========================================================================
 
   /**
-   * Get KPI items list with paging/sorting/filtering
-   *
-   * BFF Normalization:
-   * - Defaults: page=1, pageSize=50, sortBy="sortOrder", sortOrder="asc"
-   * - Clamp: pageSize <= 200
-   * - Whitelist: sortBy in ["kpiCode", "kpiName", "sortOrder", "createdAt"]
+   * Get items with paging
    */
   async getItems(
     tenantId: string,
-    query: GetKpiMasterItemsQueryDto,
-  ): Promise<KpiMasterItemListDto> {
-    // Normalize query parameters
-    const normalized = this.normalizePagingAndSorting(query, {
-      defaultSortBy: 'sortOrder',
-      sortByWhitelist: ['kpiCode', 'kpiName', 'sortOrder', 'createdAt'],
-      sortByDbMapping: {
-        kpiCode: 'kpi_code',
-        kpiName: 'kpi_name',
-        sortOrder: 'sort_order',
-        createdAt: 'created_at',
-      },
-    });
+    companyId: string,
+    userId: string,
+    query: GetItemsQuery,
+  ): Promise<KpiMasterItemDto[]> {
+    const normalized = this.normalizeItemQuery(query);
 
-    // Build API query
-    const apiQuery: GetKpiMasterItemsApiQueryDto = {
-      offset: normalized.offset,
-      limit: normalized.limit,
-      eventId: query.eventId,
-      parentKpiItemId: query.parentKpiItemId,
-      kpiType: query.kpiType,
-      hierarchyLevel: query.hierarchyLevel,
-      keyword: normalized.keyword,
-      sortBy: normalized.sortByDb,
-      sortOrder: normalized.sortOrder,
-    };
-
-    // Call Domain API
-    const response = await this.callDomainApi<{
-      data: KpiMasterItemApiDto[];
-      total: number;
-    }>('GET', '/kpi-master/items', tenantId, { params: apiQuery });
-
-    // Map to BFF DTO (basic list, no detail data)
-    const items = response.data.data.map((item: KpiMasterItemApiDto) => KpiMasterMapper.toKpiMasterItemDto(item));
-
-    return {
-      items,
-      page: normalized.page,
-      pageSize: normalized.pageSize,
-      totalCount: response.data.total,
-    };
-  }
-
-  /**
-   * Get KPI item detail by ID (with hierarchy assembly and achievement rate calculation)
-   */
-  async getItemById(tenantId: string, id: string): Promise<KpiMasterItemDetailDto> {
-    const response = await this.callDomainApi<KpiMasterItemApiDto>(
-      'GET',
-      `/kpi-master/items/${id}`,
-      tenantId,
+    const response = await firstValueFrom(
+      this.httpService.get<KpiMasterItemApiDto[]>(
+        `${this.apiBaseUrl}/api/kpi/kpi-master/items`,
+        {
+          headers: this.createHeaders(tenantId, userId, companyId),
+          params: {
+            company_id: companyId,
+            event_id: normalized.eventId,
+            kpi_type: normalized.kpiType,
+            department_stable_ids: normalized.departmentStableIds,
+            hierarchy_level: normalized.hierarchyLevel,
+          },
+        },
+      ),
     );
 
-    // TODO: Fetch related data (fact amounts, target values, action plans)
-    // and assemble into KpiMasterItemDetailDto with periodFacts and achievementRate
-
-    return KpiMasterMapper.toKpiMasterItemDetailDto(response.data, [], [], []);
+    return KpiMasterMapper.toItemList(response.data);
   }
 
   /**
-   * Create KPI item
+   * Get item by ID
+   */
+  async getItem(tenantId: string, userId: string, id: string): Promise<KpiMasterItemDetailDto> {
+    const response = await firstValueFrom(
+      this.httpService.get<KpiMasterItemApiDto>(
+        `${this.apiBaseUrl}/api/kpi/kpi-master/items/${id}`,
+        {
+          headers: this.createHeaders(tenantId, userId),
+        },
+      ),
+    );
+
+    return KpiMasterMapper.toItemDetail(response.data);
+  }
+
+  /**
+   * Create item
    */
   async createItem(
     tenantId: string,
+    companyId: string,
     userId: string,
     data: CreateKpiMasterItemDto,
-  ): Promise<KpiMasterItemDto> {
-    const apiData: CreateKpiMasterItemApiDto = {
-      kpiEventId: data.kpiEventId,
-      parentKpiItemId: data.parentKpiItemId,
-      kpiCode: data.kpiCode,
-      kpiName: data.kpiName,
-      kpiType: data.kpiType,
-      hierarchyLevel: data.hierarchyLevel,
-      refSubjectId: data.refSubjectId,
-      refKpiDefinitionId: data.refKpiDefinitionId,
-      refMetricId: data.refMetricId,
-      departmentStableId: data.departmentStableId,
-      ownerEmployeeId: data.ownerEmployeeId,
-      sortOrder: data.sortOrder,
-    };
-
-    const response = await this.callDomainApi<KpiMasterItemApiDto>(
-      'POST',
-      '/kpi-master/items',
-      tenantId,
-      { data: apiData },
-      userId,
+  ): Promise<KpiMasterItemDetailDto> {
+    const response = await firstValueFrom(
+      this.httpService.post<KpiMasterItemApiDto>(
+        `${this.apiBaseUrl}/api/kpi/kpi-master/items`,
+        KpiMasterMapper.toCreateItemApiDto(data, companyId),
+        {
+          headers: this.createHeaders(tenantId, userId, companyId),
+        },
+      ),
     );
 
-    return KpiMasterMapper.toKpiMasterItemDto(response.data);
+    return KpiMasterMapper.toItemDetail(response.data);
   }
 
   /**
-   * Update KPI item
+   * Update item
    */
   async updateItem(
     tenantId: string,
     userId: string,
     id: string,
     data: UpdateKpiMasterItemDto,
-  ): Promise<KpiMasterItemDto> {
-    const apiData: UpdateKpiMasterItemApiDto = {
-      kpiName: data.kpiName,
-      departmentStableId: data.departmentStableId,
-      ownerEmployeeId: data.ownerEmployeeId,
-      sortOrder: data.sortOrder,
-    };
-
-    const response = await this.callDomainApi<KpiMasterItemApiDto>(
-      'PUT',
-      `/kpi-master/items/${id}`,
-      tenantId,
-      { data: apiData },
-      userId,
+  ): Promise<KpiMasterItemDetailDto> {
+    const response = await firstValueFrom(
+      this.httpService.patch<KpiMasterItemApiDto>(
+        `${this.apiBaseUrl}/api/kpi/kpi-master/items/${id}`,
+        KpiMasterMapper.toUpdateItemApiDto(data),
+        {
+          headers: this.createHeaders(tenantId, userId),
+        },
+      ),
     );
 
-    return KpiMasterMapper.toKpiMasterItemDto(response.data);
+    return KpiMasterMapper.toItemDetail(response.data);
   }
 
   /**
-   * Delete KPI item (logical delete)
+   * Delete item
    */
   async deleteItem(tenantId: string, userId: string, id: string): Promise<void> {
-    await this.callDomainApi('DELETE', `/kpi-master/items/${id}`, tenantId, {}, userId);
+    await firstValueFrom(
+      this.httpService.delete(`${this.apiBaseUrl}/api/kpi/kpi-master/items/${id}`, {
+        headers: this.createHeaders(tenantId, userId),
+      }),
+    );
   }
 
   /**
-   * Normalize paging and sorting parameters
-   *
-   * BFF Responsibilities (MANDATORY):
-   * - Defaults: page=1, pageSize=50
-   * - Clamp: pageSize <= 200
-   * - Whitelist: sortBy validation
-   * - Normalize: keyword trim, empty → undefined
-   * - Transform: offset=(page-1)*pageSize, limit=pageSize
+   * Get selectable subjects
    */
-  private normalizePagingAndSorting(
-    query: GetKpiMasterEventsQueryDto | GetKpiMasterItemsQueryDto,
-    options: {
-      defaultSortBy: string;
-      sortByWhitelist: string[];
-      sortByDbMapping: Record<string, string>;
-    },
-  ): {
-    page: number;
-    pageSize: number;
-    offset: number;
-    limit: number;
-    keyword: string | undefined;
-    sortBy: string;
-    sortByDb: string;
-    sortOrder: 'asc' | 'desc';
-  } {
-    // Defaults
-    const page = Math.max(1, query.page || 1);
-    const pageSize = Math.min(200, Math.max(1, query.pageSize || 50));
-    const sortOrder = query.sortOrder || 'asc';
+  async getSelectableSubjects(
+    tenantId: string,
+    companyId: string,
+  ): Promise<SelectableSubjectListDto> {
+    const response = await firstValueFrom(
+      this.httpService.get<any[]>(
+        `${this.apiBaseUrl}/api/kpi/kpi-master/selectable-subjects`,
+        {
+          headers: this.createHeaders(tenantId, undefined, companyId),
+        },
+      ),
+    );
 
-    // Whitelist validation for sortBy
-    let sortBy = query.sortBy || options.defaultSortBy;
-    if (!options.sortByWhitelist.includes(sortBy)) {
-      sortBy = options.defaultSortBy;
+    return KpiMasterMapper.toSelectableSubjectList(response.data);
+  }
+
+  /**
+   * Get selectable metrics
+   */
+  async getSelectableMetrics(
+    tenantId: string,
+    companyId: string,
+  ): Promise<SelectableMetricListDto> {
+    const response = await firstValueFrom(
+      this.httpService.get<any[]>(`${this.apiBaseUrl}/api/kpi/kpi-master/selectable-metrics`, {
+        headers: this.createHeaders(tenantId, undefined, companyId),
+      }),
+    );
+
+    return KpiMasterMapper.toSelectableMetricList(response.data);
+  }
+
+  // =========================================================================
+  // 非財務KPI定義
+  // =========================================================================
+
+  /**
+   * Get KPI definitions with paging
+   */
+  async getKpiDefinitions(
+    tenantId: string,
+    companyId: string,
+    query: GetKpiDefinitionsQuery,
+  ): Promise<KpiDefinitionListDto> {
+    const normalized = this.normalizeDefinitionQuery(query);
+
+    const response = await firstValueFrom(
+      this.httpService.get<{ items: KpiDefinitionApiDto[]; total: number }>(
+        `${this.apiBaseUrl}/api/kpi/kpi-master/kpi-definitions`,
+        {
+          headers: this.createHeaders(tenantId, undefined, companyId),
+          params: {
+            offset: normalized.offset,
+            limit: normalized.limit,
+            sort_by: normalized.sortBy,
+            sort_order: normalized.sortOrder,
+            keyword: normalized.keyword,
+          },
+        },
+      ),
+    );
+
+    const { items, total } = response.data;
+
+    return KpiMasterMapper.toDefinitionList(items, total, normalized.page, normalized.pageSize);
+  }
+
+  /**
+   * Create KPI definition
+   */
+  async createKpiDefinition(
+    tenantId: string,
+    companyId: string,
+    userId: string,
+    data: CreateKpiDefinitionDto,
+  ): Promise<KpiDefinitionListDto> {
+    const response = await firstValueFrom(
+      this.httpService.post<KpiDefinitionApiDto>(
+        `${this.apiBaseUrl}/api/kpi/kpi-master/kpi-definitions`,
+        KpiMasterMapper.toCreateDefinitionApiDto(data, companyId),
+        {
+          headers: this.createHeaders(tenantId, userId, companyId),
+        },
+      ),
+    );
+
+    // Return as list with single item for consistency
+    return KpiMasterMapper.toDefinitionList([response.data], 1, 1, 1);
+  }
+
+  // =========================================================================
+  // 非財務KPI予実データ
+  // =========================================================================
+
+  /**
+   * Create fact amount
+   */
+  async createFactAmount(
+    tenantId: string,
+    companyId: string,
+    userId: string,
+    data: CreateKpiFactAmountDto,
+  ): Promise<KpiFactAmountDto> {
+    const context = await this.resolveFactAmountContext(tenantId, userId, data.kpiMasterItemId);
+
+    const response = await firstValueFrom(
+      this.httpService.post<KpiFactAmountApiDto>(
+        `${this.apiBaseUrl}/api/kpi/kpi-master/fact-amounts`,
+        KpiMasterMapper.toCreateFactAmountApiDto(data, context),
+        {
+          headers: this.createHeaders(tenantId, userId, companyId),
+        },
+      ),
+    );
+
+    return KpiMasterMapper.toFactAmountDto(response.data, data.kpiMasterItemId);
+  }
+
+  /**
+   * Update fact amount
+   */
+  async updateFactAmount(
+    tenantId: string,
+    userId: string,
+    id: string,
+    data: UpdateKpiFactAmountDto,
+  ): Promise<KpiFactAmountDto> {
+    const response = await firstValueFrom(
+      this.httpService.put<KpiFactAmountApiDto>(
+        `${this.apiBaseUrl}/api/kpi/kpi-master/fact-amounts/${id}`,
+        KpiMasterMapper.toUpdateFactAmountApiDto(data),
+        {
+          headers: this.createHeaders(tenantId, userId),
+        },
+      ),
+    );
+
+    return KpiMasterMapper.toFactAmountDto(response.data);
+  }
+
+  private async resolveFactAmountContext(
+    tenantId: string,
+    userId: string,
+    kpiMasterItemId: string,
+  ): Promise<{ eventId: string; kpiDefinitionId: string }> {
+    const response = await firstValueFrom(
+      this.httpService.get<KpiMasterItemApiDto>(
+        `${this.apiBaseUrl}/api/kpi/kpi-master/items/${kpiMasterItemId}`,
+        {
+          headers: this.createHeaders(tenantId, userId),
+        },
+      ),
+    );
+
+    const item = response.data;
+    if (!item.ref_kpi_definition_id) {
+      throw new BadRequestException('kpiMasterItemId must reference a KPI definition');
     }
-
-    // Map to DB column name
-    const sortByDb = options.sortByDbMapping[sortBy] || sortBy;
-
-    // Normalize keyword
-    const keyword = query.keyword?.trim() || undefined;
-
-    // Transform to offset/limit
-    const offset = (page - 1) * pageSize;
-    const limit = pageSize;
 
     return {
-      page,
-      pageSize,
-      offset,
-      limit,
-      keyword,
-      sortBy,
-      sortByDb,
-      sortOrder,
+      eventId: item.event_id,
+      kpiDefinitionId: item.ref_kpi_definition_id,
     };
   }
 
+  // =========================================================================
+  // 指標目標値
+  // =========================================================================
+
   /**
-   * Call Domain API with tenant/user headers
+   * Create target value
    */
-  private async callDomainApi<T>(
-    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
-    path: string,
+  async createTargetValue(tenantId: string, data: CreateKpiTargetValueDto): Promise<KpiTargetValueDto> {
+    const response = await firstValueFrom(
+      this.httpService.post<KpiTargetValueApiDto>(
+        `${this.apiBaseUrl}/api/kpi/kpi-master/target-values`,
+        KpiMasterMapper.toCreateTargetValueApiDto(data),
+        {
+          headers: this.createHeaders(tenantId),
+        },
+      ),
+    );
+
+    return KpiMasterMapper.toTargetValueDto(response.data);
+  }
+
+  /**
+   * Update target value
+   */
+  async updateTargetValue(
     tenantId: string,
-    config?: { params?: any; data?: any },
-    userId?: string,
-  ): Promise<AxiosResponse<T>> {
-    const headers: Record<string, string> = {
-      'x-tenant-id': tenantId,
-    };
+    id: string,
+    data: UpdateKpiTargetValueDto,
+  ): Promise<KpiTargetValueDto> {
+    const response = await firstValueFrom(
+      this.httpService.put<KpiTargetValueApiDto>(
+        `${this.apiBaseUrl}/api/kpi/kpi-master/target-values/${id}`,
+        KpiMasterMapper.toUpdateTargetValueApiDto(data),
+        {
+          headers: this.createHeaders(tenantId),
+        },
+      ),
+    );
 
-    if (userId) {
-      headers['x-user-id'] = userId;
-    }
-
-    const url = `${this.apiBaseUrl}${path}`;
-
-    switch (method) {
-      case 'GET':
-        return firstValueFrom(
-          this.httpService.get<T>(url, {
-            headers,
-            params: config?.params,
-          }),
-        );
-      case 'POST':
-        return firstValueFrom(
-          this.httpService.post<T>(url, config?.data, {
-            headers,
-          }),
-        );
-      case 'PUT':
-        return firstValueFrom(
-          this.httpService.put<T>(url, config?.data, {
-            headers,
-          }),
-        );
-      case 'DELETE':
-        return firstValueFrom(
-          this.httpService.delete<T>(url, {
-            headers,
-          }),
-        );
-      default:
-        throw new Error(`Unsupported HTTP method: ${method}`);
-    }
+    return KpiMasterMapper.toTargetValueDto(response.data);
   }
 }

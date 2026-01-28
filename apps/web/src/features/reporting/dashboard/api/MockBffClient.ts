@@ -21,6 +21,7 @@ import type {
   BffWidgetDataResponseDto,
   BffDashboardSelectorsRequestDto,
   BffDashboardSelectorsResponseDto,
+  BffKpiDefinitionOptionListDto,
   OwnerType,
   WidgetType,
   DataSourceType,
@@ -240,6 +241,29 @@ const mockSelectors: BffDashboardSelectorsResponseDto = {
           hasChildren: false,
         },
       ],
+    },
+  ],
+};
+
+const mockKpiDefinitions: BffKpiDefinitionOptionListDto = {
+  items: [
+    {
+      id: 'kpi-def-001',
+      kpiCode: 'KPI-CO2',
+      kpiName: 'CO2削減率',
+      unit: '%',
+    },
+    {
+      id: 'kpi-def-002',
+      kpiCode: 'KPI-CS',
+      kpiName: '顧客満足度',
+      unit: 'pt',
+    },
+    {
+      id: 'kpi-def-003',
+      kpiCode: 'KPI-EMP',
+      kpiName: '従業員エンゲージメント',
+      unit: 'pt',
     },
   ],
 };
@@ -486,6 +510,14 @@ export const mockBffClient: BffClient = {
   async getSelectors(query?: BffDashboardSelectorsRequestDto): Promise<BffDashboardSelectorsResponseDto> {
     await new Promise((resolve) => setTimeout(resolve, 200));
     return mockSelectors;
+  },
+
+  /**
+   * Get KPI definition selectors
+   */
+  async getKpiDefinitions(): Promise<BffKpiDefinitionOptionListDto> {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    return mockKpiDefinitions;
   },
 
   /**
