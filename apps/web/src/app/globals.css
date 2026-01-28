@@ -1,8 +1,9 @@
 @import "../shared/ui/tokens/globals.css";
 
-/* SyncFusion Dashboard Layout Styles */
+/* SyncFusion Styles */
 @import "@syncfusion/ej2-base/styles/material.css";
 @import "@syncfusion/ej2-layouts/styles/material.css";
+/* Note: Charts and other component styles are included in ej2-base */
 
 /* Dashboard Edit Mode Custom Styles */
 .widget-content {

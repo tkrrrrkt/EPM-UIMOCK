@@ -12,6 +12,7 @@
 
 import { Card } from '@/shared/ui';
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import { SparklineComponent } from '@syncfusion/ej2-react-charts';
 import type { BffWidgetDto, BffWidgetDataResponseDto, KpiCardDisplayConfig } from '@epm/contracts/bff/dashboard';
 
 interface KpiCardWidgetProps {
@@ -70,10 +71,19 @@ export function KpiCardWidget({ widget, data }: KpiCardWidgetProps) {
         </div>
       )}
 
-      {/* Sparkline placeholder */}
-      {displayConfig.showSparkline && (
-        <div className="mt-4 h-12 bg-neutral-100 rounded flex items-center justify-center text-xs text-neutral-400">
-          スパークライン（SyncFusion統合時）
+      {/* Sparkline */}
+      {displayConfig.showSparkline && data.dataPoints.length > 1 && (
+        <div className="mt-4 h-12">
+          <SparklineComponent
+            height="48px"
+            width="100%"
+            lineWidth={2}
+            type="Line"
+            fill={!difference || difference.rate === null || difference.rate >= 0 ? '#10b981' : '#ef4444'}
+            dataSource={data.dataPoints.map(dp => ({ x: dp.label, y: dp.value }))}
+            xName="x"
+            yName="y"
+          />
         </div>
       )}
 
