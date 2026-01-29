@@ -1,0 +1,1 @@
+export { MinutesFormTab } from './MinutesFormTab'
