@@ -20,8 +20,9 @@
   - tenant_id/user_id の取り回し（解決・伝搬ルール）が記載されている
 
 - [x] 0.2 Designの「Service Specification（Domain / apps/api）」が埋まっている
-  - Phase 1はMock、Phase 2以降でDomain API実装と明記されている
+  - Phase 1はMock（MockBffClient）、Phase 2以降でDomain API実装と明記されている
   - Usecase（Create/Update/Inactivate等）が列挙されている
+  - **ページCRUD制限**：ページ自動管理のため、API実装時もCRUD操作はブロック（409/422エラー返却）
 
 - [x] 0.3 Designの「Repository Specification（apps/api）」が埋まっている
   - Phase 2以降の責務として明記されている
@@ -82,13 +83,16 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 3.1_
 
 - [x] 2.2 (P) ページ関連DTOを定義する
-  - ReportPageDto（id, layoutId, pageCode, pageName, pageType, expandDimensionId, sortOrder, isActive, componentCount）
+  - ReportPageDto（id, layoutId, pageCode, pageName, pageType, sortOrder, isActive, componentCount）
   - ReportPageListDto（items, total）
-  - CreateReportPageDto（layoutId, pageCode, pageName, pageType, expandDimensionId）
-  - UpdateReportPageDto（pageCode, pageName, pageType, expandDimensionId, isActive）
-  - ReorderPagesDto（layoutId, orderedIds）
+  - **ページCRUD操作は制限**:
+    - CreateReportPageDto: 使用なし（ページは自動生成のため）
+    - UpdateReportPageDto: 使用なし（ページはシステム管理のため）
+    - ReorderPagesDto: 使用なし（1ページ固定のため）
+    - GET /bff/meetings/report-pages: ✅ 読み取り専用（許可）
+    - POST/PUT/DELETE: 🚫 ブロック（409/422エラーを返す）
   - 配置先: `packages/contracts/src/bff/meetings/`
-  - _Requirements: 5.1, 5.2, 5.3, 5.4, 6.1, 7.1_
+  - _Requirements: 読み取り機能（FR-5の一部）_
 
 - [x] 2.3 (P) コンポーネント関連DTOを定義する
   - ReportComponentDto（id, pageId, componentCode, componentName, componentType, dataSource, width, height, configJson, sortOrder, isActive）
@@ -136,40 +140,38 @@
   - _Requirements: 1.1, 2.1, 3.1, 4.3, 5.1, 6.1, 7.1, 8.3, 9.1, 10.1, 11.1, 17.1, 18.2, 19.1, 21.2, 21.3_
 
 - [ ] 3.2 MockBffClientを実装する
-  - 3階層構造のモックデータ（月次経営会議レイアウト）
-  - レイアウト/ページ/コンポーネントのCRUD処理
-  - 並べ替え処理（sortOrder再計算）
-  - ビジネスルール検証（コード重複、デフォルト制約、使用中チェック）
-  - 月次経営会議レイアウトテンプレートをハードコード定義
+  - 簡略化されたモックデータ（3レイアウト × 1ページ/レイアウト × 4コンポーネント/ページ）
+  - レイアウト/コンポーネントのCRUD処理（ページはgetのみ）
+  - **ページ自動管理ロジック**:
+    - createLayout()実行時に自動的にページを生成（pageCode='DASHBOARD', pageType='FIXED'）
+    - createPage(): 409 Conflict ("ページは自動管理されています")
+    - updatePage(): 422 Unprocessable ("ページはシステム管理されています")
+    - deletePage(): 422 Unprocessable ("レイアウトを削除してください")
+  - コンポーネント並べ替え処理（sortOrder再計算）
+  - ビジネスルール検証（コード重複、1レイアウト/会議種別制約）
+  - テンプレートデータの簡略化（3テンプレート）
   - Task 3.1に依存（Interface実装）
-  - _Requirements: 2.2, 2.3, 2.4, 2.5, 2.6, 3.3, 3.4, 4.4, 4.5, 6.2, 6.3, 6.4, 6.5, 6.6, 7.3, 7.4, 9.3, 11.2, 11.3, 11.4, 11.5, 11.6, 17.3, 17.4, 19.3, 19.4, 21.4_
+  - _Requirements: 2.2, 2.3, 3.3, 3.4, 11.2, 11.3, 11.4, 11.5, 11.6, 17.3, 17.4, 19.3, 19.4, 21.4_
 
 ---
 
 ## 4. UI: 階層構造ツリーの実装
 
 - [ ] 4.1 LayoutTreeコンポーネントを実装する
-  - レイアウト一覧表示（sortOrder順）
+  - レイアウト一覧表示（sortOrder順、3レイアウト固定）
   - 各レイアウトの展開/折りたたみ
-  - ページ一覧のネスト表示
+  - **ページ節点の表示（グレーアウト、非クリック可能）**:
+    - ページは1つ/レイアウト（固定）
+    - ツールチップ: "ダッシュボード設定（システム管理）"
+    - 選択不可、アイコンはロック表示
   - コンポーネント一覧のネスト表示
-  - デフォルトレイアウトのバッジ表示
   - 無効項目のグレーアウト
-  - 選択状態の管理
+  - 選択状態の管理（ページは選択対象外）
   - Task 3.2に依存（データ取得）
-  - _Requirements: 1.1, 1.2, 1.3, 1.4, 5.1, 5.2, 5.3, 5.4, 10.1, 10.2, 10.3, 10.4, 10.5_
-
-- [ ] 4.2 ページ並べ替え機能を実装する
-  - @dnd-kit/coreと@dnd-kit/sortableを使用
-  - 同一レイアウト内でのドラッグ＆ドロップ
-  - ドロップ可能位置のビジュアルフィードバック
-  - sortOrder再計算APIコール
-  - Task 4.1に依存（ツリー構造内での実装）
-  - _Requirements: 9.1, 9.2, 9.3_
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 10.1, 10.2, 10.3, 10.4, 10.5_
 
 - [ ] 4.3 コンポーネント並べ替え機能を実装する
-  - 同一ページ内でのドラッグ＆ドロップ
-  - ページ間移動の禁止
+  - ページ内でのドラッグ＆ドロップ（1ページのみ）
   - ドロップ可能位置のビジュアルフィードバック
   - sortOrder再計算APIコール
   - Task 4.1に依存（ツリー構造内での実装）
@@ -180,19 +182,12 @@
 ## 5. UI: 詳細パネルの実装
 
 - [ ] 5.1 LayoutDetailPanelを実装する
-  - レイアウト基本情報フォーム（layoutCode, layoutName, description, isDefault, isActive）
+  - レイアウト基本情報フォーム（layoutCode, layoutName, description, isActive）
+  - **isDefault フィールドは非表示**（常にtrue、会議種別ごとに1レイアウト制約のため）
   - バリデーション（必須、文字数、フォーマット）
   - 保存・キャンセル・削除ボタン
   - Task 4.1に依存（選択状態連携）
   - _Requirements: 2.1, 3.1, 3.3, 3.4_
-
-- [ ] 5.2 PageDetailPanelを実装する
-  - ページ基本情報フォーム（pageCode, pageName, pageType, expandDimensionId, isActive）
-  - ページタイプ選択によるexpandDimensionId入力制御
-  - バリデーション
-  - 保存・キャンセル・削除ボタン
-  - Task 4.1に依存（選択状態連携）
-  - _Requirements: 6.1, 6.4, 7.1, 7.4_
 
 - [ ] 5.3 ComponentDetailPanelを実装する
   - コンポーネント基本情報フォーム（componentCode, componentName, componentType, dataSource, width, height）
@@ -290,19 +285,12 @@
 ## 7. UI: ダイアログの実装
 
 - [ ] 7.1 (P) CreateLayoutDialogを実装する
-  - レイアウト基本情報入力（layoutCode, layoutName, description, isDefault）
+  - レイアウト基本情報入力（layoutCode, layoutName, description）
+  - **isDefault フィールドは不要**（常にtrue、UI非表示）
   - バリデーション（必須、文字数、フォーマット）
-  - 作成API呼び出し
+  - 作成API呼び出し（ページは自動生成されることを説明するメッセージを表示）
   - Task 3.2に依存（API呼び出し）
   - _Requirements: 2.1_
-
-- [ ] 7.2 (P) CreatePageDialogを実装する
-  - ページ基本情報入力（pageCode, pageName, pageType, expandDimensionId）
-  - ページタイプ選択による入力制御
-  - バリデーション
-  - 作成API呼び出し
-  - Task 3.2に依存（API呼び出し）
-  - _Requirements: 6.1_
 
 - [ ] 7.3 (P) CreateComponentDialogを実装する
   - コンポーネント基本情報入力（componentCode, componentName, componentType, dataSource, width）
@@ -312,8 +300,8 @@
   - _Requirements: 11.1_
 
 - [ ] 7.4 (P) TemplateSelectDialogを実装する
-  - テンプレート一覧表示
-  - テンプレート詳細プレビュー（ページ数、コンポーネント数）
+  - **簡略化されたテンプレート表示** (3テンプレート)
+  - テンプレート詳細プレビュー（1ページ固定、4コンポーネント固定）
   - 選択とレイアウト情報入力
   - 作成API呼び出し
   - Task 3.2に依存（API呼び出し）
@@ -321,9 +309,9 @@
 
 - [ ] 7.5 DeleteConfirmDialogを実装する
   - 削除確認メッセージ（関連データ数表示）
-  - レイアウト削除時：ページ数表示
-  - ページ削除時：コンポーネント数表示
-  - エラー表示（デフォルト削除不可、使用中削除不可）
+  - レイアウト削除時：ページ数表示（常に1ページ）
+  - コンポーネント削除時：レイアウトコンポーネント数表示
+  - エラー表示（最後のレイアウト削除不可など）
   - Task 4.1に依存（ツリーからの呼び出し）
   - _Requirements: 4.1, 4.2, 4.4, 4.5, 8.1, 8.2, 18.1_
 
@@ -336,9 +324,10 @@
   - 会議種別情報のヘッダー表示
   - プレビューボタン
   - レイアウト追加/テンプレートから作成ボタン
+  - **ページ管理UI なし**（ページはシステム自動管理）
   - ローディング・エラー状態の処理
   - Task 4, 5, 7に依存（全コンポーネント統合）
-  - _Requirements: 1.1, 5.1, 10.1_
+  - _Requirements: 1.1, 10.1_
 
 - [ ] 8.2 LayoutPreviewを実装する
   - 別ルート（/meetings/report-layout/:meetingTypeId/preview/:layoutId）

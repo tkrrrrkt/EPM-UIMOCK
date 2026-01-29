@@ -28,9 +28,9 @@ import type {
 // ========== Mock Data ==========
 
 const mockMeetingTypes = [
-  { id: 'mt-001', typeCode: 'MONTHLY_MGMT', typeName: '月次経営会議' },
-  { id: 'mt-002', typeCode: 'QUARTERLY_MGMT', typeName: '四半期経営会議' },
-  { id: 'mt-003', typeCode: 'BOARD_MEETING', typeName: '取締役会' },
+  { id: 'mt-1', typeCode: 'MONTHLY_MGMT', typeName: '月次経営会議' },
+  { id: 'mt-2', typeCode: 'QUARTERLY_MGMT', typeName: '四半期経営会議' },
+  { id: 'mt-3', typeCode: 'BOARD_MEETING', typeName: '取締役会' },
 ]
 
 // 階層組織ツリー（報告対象フラグ付き）
@@ -128,8 +128,9 @@ const mockEvents: MeetingEventDto[] = [
     id: 'evt-001',
     eventCode: 'MTG_202606',
     eventName: '6月度経営会議',
-    meetingTypeId: 'mt-001',
+    meetingTypeId: 'mt-1',
     meetingTypeName: '月次経営会議',
+    reportLayoutId: 'layout-1',
     targetPeriodId: 'p-202606',
     targetPeriodName: '2026年6月度',
     targetFiscalYear: 2026,
@@ -144,8 +145,9 @@ const mockEvents: MeetingEventDto[] = [
     id: 'evt-002',
     eventCode: 'MTG_202605',
     eventName: '5月度経営会議',
-    meetingTypeId: 'mt-001',
+    meetingTypeId: 'mt-1',
     meetingTypeName: '月次経営会議',
+    reportLayoutId: 'layout-1',
     targetPeriodId: 'p-202605',
     targetPeriodName: '2026年5月度',
     targetFiscalYear: 2026,
@@ -160,8 +162,9 @@ const mockEvents: MeetingEventDto[] = [
     id: 'evt-003',
     eventCode: 'MTG_2026Q1',
     eventName: '2026年度第1四半期経営会議',
-    meetingTypeId: 'mt-002',
+    meetingTypeId: 'mt-2',
     meetingTypeName: '四半期経営会議',
+    reportLayoutId: 'layout-3',
     targetPeriodId: 'p-2026Q1',
     targetPeriodName: '2026年度Q1',
     targetFiscalYear: 2026,
@@ -176,8 +179,9 @@ const mockEvents: MeetingEventDto[] = [
     id: 'evt-004',
     eventCode: 'MTG_202607',
     eventName: '7月度経営会議',
-    meetingTypeId: 'mt-001',
+    meetingTypeId: 'mt-1',
     meetingTypeName: '月次経営会議',
+    reportLayoutId: 'layout-1',
     targetPeriodId: 'p-202607',
     targetPeriodName: '2026年7月度',
     targetFiscalYear: 2026,
@@ -191,8 +195,9 @@ const mockEvents: MeetingEventDto[] = [
     id: 'evt-005',
     eventCode: 'MTG_202604',
     eventName: '4月度経営会議',
-    meetingTypeId: 'mt-001',
+    meetingTypeId: 'mt-1',
     meetingTypeName: '月次経営会議',
+    reportLayoutId: 'layout-1',
     targetPeriodId: 'p-202604',
     targetPeriodName: '2026年4月度',
     targetFiscalYear: 2026,
@@ -314,12 +319,30 @@ const mockKpiCards: KpiCardListDto = {
   ],
 }
 
-const mockFormFields = [
-  { fieldId: 'f-001', fieldCode: 'HIGHLIGHTS', fieldName: '当月ハイライト', fieldType: 'TEXTAREA', sectionCode: 'SEC1', sectionName: '概要', isRequired: true },
-  { fieldId: 'f-002', fieldCode: 'ISSUES', fieldName: '課題・リスク', fieldType: 'TEXTAREA', sectionCode: 'SEC1', sectionName: '概要', isRequired: true },
-  { fieldId: 'f-003', fieldCode: 'ACTIONS', fieldName: 'アクションプラン', fieldType: 'TEXTAREA', sectionCode: 'SEC2', sectionName: '施策', isRequired: false },
-  { fieldId: 'f-004', fieldCode: 'FORECAST', fieldName: '見通しコメント', fieldType: 'TEXT', sectionCode: 'SEC3', sectionName: '見通し', isRequired: false },
-]
+// Form field mappings for each meeting type (mt-1, mt-2, mt-3)
+const mockFormFieldsByMeetingType: Record<string, Array<{ fieldId: string; fieldCode: string; fieldName: string; fieldType: string; sectionCode: string; sectionName: string; isRequired: boolean }>> = {
+  'mt-1': [ // 月次経営会議
+    { fieldId: 'f-1-1', fieldCode: 'SALES_OUTLOOK', fieldName: '売上見通し', fieldType: 'SELECT', sectionCode: 'SEC1', sectionName: '業績サマリー', isRequired: true },
+    { fieldId: 'f-1-2', fieldCode: 'PROFIT_OUTLOOK', fieldName: '利益見通し', fieldType: 'SELECT', sectionCode: 'SEC1', sectionName: '業績サマリー', isRequired: true },
+    { fieldId: 'f-1-3', fieldCode: 'SUMMARY_COMMENT', fieldName: 'サマリーコメント', fieldType: 'TEXTAREA', sectionCode: 'SEC1', sectionName: '業績サマリー', isRequired: true },
+    { fieldId: 'f-1-4', fieldCode: 'SALES_VARIANCE', fieldName: '売上差異の主要因', fieldType: 'TEXTAREA', sectionCode: 'SEC2', sectionName: '差異要因', isRequired: true },
+    { fieldId: 'f-1-5', fieldCode: 'GROSS_PROFIT_VARIANCE', fieldName: '粗利差異の主要因', fieldType: 'TEXTAREA', sectionCode: 'SEC2', sectionName: '差異要因', isRequired: true },
+    { fieldId: 'f-1-6', fieldCode: 'RISK_ITEMS', fieldName: 'リスク項目', fieldType: 'TEXTAREA', sectionCode: 'SEC3', sectionName: 'リスク・課題', isRequired: false },
+    { fieldId: 'f-1-7', fieldCode: 'ACTION_ITEMS', fieldName: 'アクション項目', fieldType: 'TEXTAREA', sectionCode: 'SEC4', sectionName: 'アクション', isRequired: true },
+  ],
+  'mt-2': [ // 四半期経営会議
+    { fieldId: 'f-2-1', fieldCode: 'QUARTERLY_SUMMARY', fieldName: '四半期サマリー', fieldType: 'TEXTAREA', sectionCode: 'SEC1', sectionName: 'サマリー', isRequired: true },
+    { fieldId: 'f-2-2', fieldCode: 'STRATEGIC_ANALYSIS', fieldName: '戦略分析', fieldType: 'TEXTAREA', sectionCode: 'SEC1', sectionName: 'サマリー', isRequired: true },
+    { fieldId: 'f-2-3', fieldCode: 'BUDGET_VARIANCE_DETAIL', fieldName: '予算差異詳細', fieldType: 'TEXTAREA', sectionCode: 'SEC2', sectionName: '差異分析', isRequired: true },
+    { fieldId: 'f-2-4', fieldCode: 'STRATEGIC_RISKS', fieldName: '戦略的リスク', fieldType: 'TEXTAREA', sectionCode: 'SEC3', sectionName: '戦略課題', isRequired: false },
+    { fieldId: 'f-2-5', fieldCode: 'STRATEGIC_ACTIONS', fieldName: '戦略アクション', fieldType: 'TEXTAREA', sectionCode: 'SEC4', sectionName: 'アクション', isRequired: true },
+  ],
+  'mt-3': [ // 取締役会
+    { fieldId: 'f-3-1', fieldCode: 'BOARD_SUMMARY', fieldName: 'エグゼクティブサマリー', fieldType: 'TEXTAREA', sectionCode: 'SEC1', sectionName: 'サマリー', isRequired: true },
+    { fieldId: 'f-3-2', fieldCode: 'KEY_DECISIONS', fieldName: '主要決定事項', fieldType: 'TEXTAREA', sectionCode: 'SEC2', sectionName: '決定事項', isRequired: true },
+    { fieldId: 'f-3-3', fieldCode: 'BOARD_RISKS', fieldName: 'ガバナンスリスク', fieldType: 'TEXTAREA', sectionCode: 'SEC3', sectionName: 'リスク', isRequired: false },
+  ],
+}
 
 // ========== MockBffClient Implementation ==========
 
@@ -511,6 +534,15 @@ export class MockBffClient implements BffClient {
   ): Promise<MeetingSubmissionDto> {
     await this.delay(300)
 
+    // Get event to determine meeting type
+    const event = mockEvents.find((e) => e.id === eventId)
+    if (!event) {
+      throw new Error(`Meeting event not found: ${eventId}`)
+    }
+
+    // Get form fields for this meeting type
+    const formFields = mockFormFieldsByMeetingType[event.meetingTypeId] || mockFormFieldsByMeetingType['mt-1']
+
     // Return empty form for new submission
     return {
       id: '',
@@ -519,7 +551,7 @@ export class MockBffClient implements BffClient {
       departmentStableId,
       departmentName: this.getDepartmentName(departmentStableId),
       status: 'NOT_STARTED' as SubmissionStatus,
-      values: mockFormFields.map((f) => ({
+      values: formFields.map((f) => ({
         id: '',
         fieldId: f.fieldId,
         fieldCode: f.fieldCode,

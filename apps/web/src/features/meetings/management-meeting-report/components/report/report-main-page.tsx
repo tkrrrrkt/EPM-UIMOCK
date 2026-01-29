@@ -19,12 +19,10 @@ import {
   Target,
   BarChart3,
   GitCompare,
-  ExternalLink,
 } from 'lucide-react'
 import { Button } from '@/shared/ui/components/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/components/tabs'
 import { Skeleton } from '@/shared/ui/components/skeleton'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/components/card'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,6 +48,14 @@ const ConfidenceReportDashboard = lazy(() =>
 )
 const BudgetTrendDashboard = lazy(() =>
   import('@/features/report/budget-trend-report').then((m) => ({ default: m.BudgetTrendDashboard }))
+)
+
+// Lazy load KPI list and minutes form for embedded display
+const KpiListPage = lazy(() =>
+  import('@/features/kpi/kpi-master/components/kpi-list-page').then((m) => ({ default: m.KpiListPage }))
+)
+const MinutesFormPage = lazy(() =>
+  import('../../components/minutes/minutes-form-page').then((m) => ({ default: m.MinutesFormPage }))
 )
 
 // Loading fallback component for lazy-loaded reports
@@ -281,7 +287,21 @@ export function ReportMainPage({ client, eventId }: ReportMainPageProps) {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/*
+        Fixed Tab Structure for Meeting Reports (Architectural Decision: SIMPLIFIED_LAYOUT_SYSTEM)
+
+        タブは FIXED かつ HARDCODED であり、データベースレイアウトページにより駆動されていません。
+
+        各タブの役割：
+        - サマリー: レポートレイアウト設定から定義されたダッシュボードコンポーネント（configurable）
+        - 部門報告: 報告フォーム設定のセクション/フィールド構造を使用（fixed display）
+        - KPI・AP: kpi-master フィーチャーに組込まれたKPI表示（fixed display）
+        - 詳細分析: 既存レポートリンク（fixed display）
+        - 前回比較: Phase 3で実装予定（currently placeholder）
+        - 議事録: 報告フォーム設定のフォーム構造を使用（fixed form）
+
+        参照: .kiro/specs/meetings/meeting-report-layout/ARCHITECTURE_DECISION.md
+      */}
       <div className="flex-1 flex flex-col min-h-0">
         <Tabs
           value={activeTab}
@@ -329,54 +349,12 @@ export function ReportMainPage({ client, eventId }: ReportMainPageProps) {
             </TabsContent>
 
             {/* D5: KPI・アクション */}
-            <TabsContent value="kpi-actions" className="m-0 p-6">
-              <div className="max-w-4xl mx-auto">
-                <div className="mb-6">
-                  <h2 className="text-lg font-semibold">KPI・アクションプラン</h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    KPI達成状況とアクションプランの進捗を確認できます
-                  </p>
+            <TabsContent value="kpi-actions" className="m-0 h-full data-[state=active]:flex data-[state=active]:flex-col">
+              <Suspense fallback={<ReportLoadingFallback />}>
+                <div className="h-full overflow-auto">
+                  <KpiListPage />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Card className="hover:border-primary/50 transition-colors cursor-pointer"
-                    onClick={() => router.push('/kpi')}>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Target className="h-5 w-5 text-primary" />
-                        KPI管理
-                      </CardTitle>
-                      <CardDescription>
-                        全社・部門別のKPI達成状況を確認
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <Button variant="outline" className="w-full">
-                        KPI管理を開く
-                        <ExternalLink className="h-4 w-4 ml-2" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="hover:border-primary/50 transition-colors cursor-pointer"
-                    onClick={() => router.push('/action-plans')}>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <ClipboardList className="h-5 w-5 text-primary" />
-                        アクションプラン
-                      </CardTitle>
-                      <CardDescription>
-                        アクションプランの進捗状況を確認
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <Button variant="outline" className="w-full">
-                        アクションプランを開く
-                        <ExternalLink className="h-4 w-4 ml-2" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
+              </Suspense>
             </TabsContent>
 
             {/* D3: 詳細分析 - サブタブ切替式 */}
@@ -450,19 +428,16 @@ export function ReportMainPage({ client, eventId }: ReportMainPageProps) {
             </TabsContent>
 
             {/* D8: 議事録 */}
-            <TabsContent value="minutes" className="m-0 p-6">
-              <div className="flex flex-col items-center justify-center h-[400px] text-center">
-                <ScrollText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <p className="text-lg font-medium text-muted-foreground">
-                  議事録
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  会議の議事録と決定事項を表示します
-                </p>
-                <p className="text-xs text-muted-foreground mt-4">
-                  Phase 3で実装予定
-                </p>
-              </div>
+            <TabsContent value="minutes" className="m-0 h-full data-[state=active]:flex data-[state=active]:flex-col">
+              <Suspense fallback={<ReportLoadingFallback />}>
+                <div className="h-full overflow-auto">
+                  <MinutesFormPage
+                    bffClient={client}
+                    eventId={eventId}
+                    onBack={handleBack}
+                  />
+                </div>
+              </Suspense>
             </TabsContent>
           </div>
         </Tabs>

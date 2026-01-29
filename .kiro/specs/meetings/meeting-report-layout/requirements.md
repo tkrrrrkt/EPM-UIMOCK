@@ -32,10 +32,34 @@
 
 ### ビジネス目的
 
-- 会議種別ごとに適切なレポートレイアウトを設計できる
-- ページ（タブ）構成を柔軟にカスタマイズできる
+- 会議種別ごとに適切なダッシュボードレイアウトを設計できる
 - 各種コンポーネント（KPIカード、表、グラフ等）を配置できる
-- 標準レイアウト（エグゼクティブサマリー等）を定義・再利用できる
+- 標準レイアウトテンプレートを定義・再利用できる
+
+---
+
+## Architectural Constraints
+
+**Design Decision**: レポートレイアウト設定は、会議種別ごとに**1つのカスタマイズ可能なダッシュボードページ**を定義します。
+
+**制約事項**:
+- 各会議種別に **1つのレイアウト** のみ存在（is_default は常に true）
+- 各レイアウトに **1つのページ** （自動生成、pageCode='DASHBOARD', pageType='FIXED'）
+- ページはシステム管理（ユーザーは追加・編集・削除不可）
+- コンポーネント配置がカスタマイズの主要手段
+- UI タブは固定構成（データベース駆動ではない）:
+  - **サマリー**: レイアウト設定で定義したダッシュボード（コンポーネント可変）
+  - **部門報告**: 報告フォーム設定で定義した構造で表示（固定）
+  - **KPI・AP**: 固定表示（KPI機能から埋め込み）
+  - **詳細分析**: 固定表示（既存レポートリンク）
+  - **前回比較**: Phase 3（保留中）
+  - **議事録**: 報告フォーム設定で定義したフォーム（固定）
+
+**設計意図**:
+- **シンプルな UX**: ページ管理の複雑さを排除
+- **高速実装**: 74%の実装範囲削減
+- **十分な柔軟性**: コンポーネントレベルでの自由なカスタマイズ
+- **将来対応**: 要件変更時に制約を緩和可能（エンティティスキーマ変更不要）
 
 ---
 
@@ -91,8 +115,9 @@
 | FR-2.2 | The Report Layout Service shall レイアウトコードを会議種別内で一意とする | P1 |
 | FR-2.3 | If 同一会議種別内で既に存在するレイアウトコードで登録しようとした場合, the Report Layout Service shall 「レイアウトコードが重複しています」エラーを返す | P1 |
 | FR-2.4 | The Report Layout Service shall 新規レイアウトの sort_order を既存レイアウトの最大値 + 10 として初期化する | P1 |
-| FR-2.5 | When 会議種別に初めてレイアウトを作成した時, the Report Layout Service shall is_default を true として初期化する | P1 |
-| FR-2.6 | The Report Layout Service shall 登録時に is_active を true として初期化する | P1 |
+| FR-2.5 | When レイアウトを作成した時, the Report Layout Service shall 自動的に固定ダッシュボードページ（pageCode='DASHBOARD', pageType='FIXED', pageName='ダッシュボード設定'）を作成する | P1 |
+| FR-2.6 | The Report Layout Service shall 登録時に is_default を true として初期化する | P1 |
+| FR-2.7 | The Report Layout Service shall 登録時に is_active を true として初期化する | P1 |
 
 **入力項目**:
 - レイアウトコード（layout_code）: 必須、英数字アンダースコア、最大50文字
@@ -128,131 +153,41 @@
 | FR-4.1 | When ユーザーがレイアウトの削除ボタンを押した時, the Report Layout UI shall 確認ダイアログを表示する | P1 |
 | FR-4.2 | When レイアウトにページが存在する場合, the Report Layout UI shall 「このレイアウトには[N]個のページがあります。レイアウトと関連データをすべて削除しますか？」という警告を表示する | P1 |
 | FR-4.3 | When ユーザーが確認ダイアログで「削除」を選択した時, the Report Layout Service shall 対象レイアウト・ページ・コンポーネントをすべて物理削除する | P1 |
-| FR-4.4 | If 削除対象がデフォルトレイアウト（is_default=true）の場合, the Report Layout Service shall 「デフォルトレイアウトは削除できません」エラーを返す | P1 |
+| FR-4.4 | If 削除対象が会議種別に唯一のレイアウト（is_default=true）の場合, the Report Layout Service shall 「会議種別に唯一のレイアウトは削除できません」エラーを返す | P1 |
 | FR-4.5 | If 削除対象が会議イベントで使用中の場合, the Report Layout Service shall 「使用中のレイアウトは削除できません」エラーを返す | P1 |
 
 ---
 
-### FR-5: ページ一覧表示
+### FR-9: コンポーネント一覧表示
 
-**Objective:** As a システム管理者, I want レイアウト内のページ（タブ）を一覧表示できること, so that レポート構成を把握できる
+**Objective:** As a システム管理者, I want ダッシュボード内のコンポーネントを一覧表示できること, so that ダッシュボード構成を把握できる
 
 #### Acceptance Criteria
 
 | ID | 要件 | 優先度 |
 |----|------|--------|
-| FR-5.1 | When ユーザーがレイアウトを選択した時, the Report Layout Service shall 当該レイアウトに属するページ一覧をsort_order順で表示する | P1 |
-| FR-5.2 | The Report Layout Service shall 各ページにページコード、ページ名、ページタイプ（FIXED/PER_DEPARTMENT/PER_BU）、コンポーネント数を表示する | P1 |
-| FR-5.3 | The Report Layout Service shall ページタイプをバッジで視覚的に表示する | P2 |
-| FR-5.4 | The Report Layout Service shall 無効なページ（is_active=false）をグレーアウト表示する | P2 |
+| FR-9.1 | When ユーザーがダッシュボードを選択した時, the Report Layout Service shall 当該ダッシュボードに属するコンポーネント一覧をsort_order順で表示する | P1 |
+| FR-9.2 | The Report Layout Service shall 各コンポーネントにコンポーネントコード、コンポーネント名、コンポーネントタイプ、データソース、幅を表示する | P1 |
+| FR-9.3 | The Report Layout Service shall コンポーネントタイプをアイコンとバッジで視覚的に表示する | P2 |
+| FR-9.4 | The Report Layout Service shall 幅（FULL/HALF/THIRD）を視覚的なプレビューで表示する | P2 |
+| FR-9.5 | The Report Layout Service shall 無効なコンポーネント（is_active=false）をグレーアウト表示する | P2 |
 
 ---
 
-### FR-6: ページ追加
+### FR-10: コンポーネント追加
 
-**Objective:** As a システム管理者, I want レイアウトに新しいページ（タブ）を追加できること, so that レポート構成を拡張できる
-
-#### Acceptance Criteria
-
-| ID | 要件 | 優先度 |
-|----|------|--------|
-| FR-6.1 | When ユーザーが必須項目（ページコード、ページ名、ページタイプ）を入力して登録を実行した時, the Report Layout Service shall 新しいページレコードを作成する | P1 |
-| FR-6.2 | The Report Layout Service shall ページコードをレイアウト内で一意とする | P1 |
-| FR-6.3 | If 同一レイアウト内で既に存在するページコードで登録しようとした場合, the Report Layout Service shall 「ページコードが重複しています」エラーを返す | P1 |
-| FR-6.4 | When ページタイプが PER_DEPARTMENT または PER_BU の場合, the Report Layout Service shall 展開軸（expand_dimension_id）の入力を任意とする | P2 |
-| FR-6.5 | The Report Layout Service shall 新規ページの sort_order を既存ページの最大値 + 10 として初期化する | P1 |
-| FR-6.6 | The Report Layout Service shall 登録時に is_active を true として初期化する | P1 |
-
-**入力項目**:
-- ページコード（page_code）: 必須、英数字アンダースコア、最大50文字
-- ページ名（page_name）: 必須、最大200文字
-- ページタイプ（page_type）: 必須、FIXED/PER_DEPARTMENT/PER_BU から選択
-- 展開軸（expand_dimension_id）: PER_DEPARTMENT/PER_BU時に任意
-
-**ページタイプ一覧**:
-
-| タイプ | 説明 | 用途 |
-|--------|------|------|
-| FIXED | 固定1ページ | エグゼクティブサマリー、全社集計 |
-| PER_DEPARTMENT | 部門ごとに展開 | 部門別詳細ページ |
-| PER_BU | 事業部ごとに展開 | 事業部別詳細ページ |
-
----
-
-### FR-7: ページ編集
-
-**Objective:** As a システム管理者, I want ページ情報を編集できること, so that レポート構成を調整できる
+**Objective:** As a システム管理者, I want レイアウトの固定ダッシュボードに新しいコンポーネントを追加できること, so that ダッシュボード表示内容を拡張できる
 
 #### Acceptance Criteria
 
 | ID | 要件 | 優先度 |
 |----|------|--------|
-| FR-7.1 | When ユーザーがページ情報を編集して更新を実行した時, the Report Layout Service shall 対象ページのレコードを更新する | P1 |
-| FR-7.2 | If 更新対象のページが存在しない場合, the Report Layout Service shall 「ページが見つかりません」エラーを返す | P1 |
-| FR-7.3 | If ページコードを変更して既存のコードと重複する場合, the Report Layout Service shall 「ページコードが重複しています」エラーを返す | P1 |
-| FR-7.4 | The Report Layout Service shall 更新時に updated_at を記録する | P1 |
-
----
-
-### FR-8: ページ削除
-
-**Objective:** As a システム管理者, I want ページを削除できること, so that 不要なページをレポートから除外できる
-
-#### Acceptance Criteria
-
-| ID | 要件 | 優先度 |
-|----|------|--------|
-| FR-8.1 | When ユーザーがページの削除ボタンを押した時, the Report Layout UI shall 確認ダイアログを表示する | P1 |
-| FR-8.2 | When ページにコンポーネントが存在する場合, the Report Layout UI shall 「このページには[N]個のコンポーネントがあります。ページとコンポーネントをすべて削除しますか？」という警告を表示する | P1 |
-| FR-8.3 | When ユーザーが確認ダイアログで「削除」を選択した時, the Report Layout Service shall 対象ページと所属するコンポーネントをすべて物理削除する | P1 |
-| FR-8.4 | If 削除対象のページが存在しない場合, the Report Layout Service shall 「ページが見つかりません」エラーを返す | P1 |
-
----
-
-### FR-9: ページ並べ替え
-
-**Objective:** As a システム管理者, I want ページの順序をドラッグ＆ドロップで変更できること, so that タブ順序を直感的に編集できる
-
-#### Acceptance Criteria
-
-| ID | 要件 | 優先度 |
-|----|------|--------|
-| FR-9.1 | When ユーザーがページをドラッグして別の位置にドロップした時, the Report Layout Service shall 対象ページの sort_order を更新して順序を変更する | P1 |
-| FR-9.2 | The Report Layout UI shall ドラッグ中にドロップ可能な位置を視覚的に示す | P1 |
-| FR-9.3 | When 並べ替えが完了した時, the Report Layout Service shall 影響を受けたページの sort_order を再計算する | P1 |
-
----
-
-### FR-10: コンポーネント一覧表示
-
-**Objective:** As a システム管理者, I want ページ内のコンポーネントを一覧表示できること, so that ページ構成を把握できる
-
-#### Acceptance Criteria
-
-| ID | 要件 | 優先度 |
-|----|------|--------|
-| FR-10.1 | When ユーザーがページを選択した時, the Report Layout Service shall 当該ページに属するコンポーネント一覧をsort_order順で表示する | P1 |
-| FR-10.2 | The Report Layout Service shall 各コンポーネントにコンポーネントコード、コンポーネント名、コンポーネントタイプ、データソース、幅を表示する | P1 |
-| FR-10.3 | The Report Layout Service shall コンポーネントタイプをアイコンとバッジで視覚的に表示する | P2 |
-| FR-10.4 | The Report Layout Service shall 幅（FULL/HALF/THIRD）を視覚的なプレビューで表示する | P2 |
-| FR-10.5 | The Report Layout Service shall 無効なコンポーネント（is_active=false）をグレーアウト表示する | P2 |
-
----
-
-### FR-11: コンポーネント追加
-
-**Objective:** As a システム管理者, I want ページに新しいコンポーネントを追加できること, so that レポート表示内容を拡張できる
-
-#### Acceptance Criteria
-
-| ID | 要件 | 優先度 |
-|----|------|--------|
-| FR-11.1 | When ユーザーが必須項目（コンポーネントコード、コンポーネント名、コンポーネントタイプ、データソース）を入力して登録を実行した時, the Report Layout Service shall 新しいコンポーネントレコードを作成する | P1 |
-| FR-11.2 | The Report Layout Service shall コンポーネントコードをページ内で一意とする | P1 |
-| FR-11.3 | If 同一ページ内で既に存在するコンポーネントコードで登録しようとした場合, the Report Layout Service shall 「コンポーネントコードが重複しています」エラーを返す | P1 |
-| FR-11.4 | The Report Layout Service shall 新規コンポーネントの sort_order を既存コンポーネントの最大値 + 10 として初期化する | P1 |
-| FR-11.5 | The Report Layout Service shall 登録時に is_active を true として初期化する | P1 |
-| FR-11.6 | The Report Layout Service shall config_json のデフォルト値をコンポーネントタイプに応じて初期化する | P2 |
+| FR-10.1 | When ユーザーが必須項目（コンポーネントコード、コンポーネント名、コンポーネントタイプ、データソース）を入力して登録を実行した時, the Report Layout Service shall 新しいコンポーネントレコードを作成する | P1 |
+| FR-10.2 | The Report Layout Service shall コンポーネントコードをページ内で一意とする | P1 |
+| FR-10.3 | If 同一ページ内で既に存在するコンポーネントコードで登録しようとした場合, the Report Layout Service shall 「コンポーネントコードが重複しています」エラーを返す | P1 |
+| FR-10.4 | The Report Layout Service shall 新規コンポーネントの sort_order を既存コンポーネントの最大値 + 10 として初期化する | P1 |
+| FR-10.5 | The Report Layout Service shall 登録時に is_active を true として初期化する | P1 |
+| FR-10.6 | The Report Layout Service shall config_json のデフォルト値をコンポーネントタイプに応じて初期化する | P2 |
 
 **入力項目**:
 - コンポーネントコード（component_code）: 必須、英数字アンダースコア、最大50文字
@@ -265,7 +200,7 @@
 
 ---
 
-### FR-12: コンポーネントタイプ設定
+### FR-11: コンポーネントタイプ設定
 
 **Objective:** As a システム管理者, I want コンポーネントタイプに応じた詳細設定ができること, so that 適切な表示を構成できる
 
@@ -273,8 +208,8 @@
 
 | ID | 要件 | 優先度 |
 |----|------|--------|
-| FR-12.1 | When コンポーネントタイプが KPI_CARD の場合, the Report Layout UI shall KPIカード固有の設定UIを表示する | P1 |
-| FR-12.2 | When コンポーネントタイプが TABLE の場合, the Report Layout UI shall テーブル固有の設定UIを表示する | P1 |
+| FR-11.1 | When コンポーネントタイプが KPI_CARD の場合, the Report Layout UI shall KPIカード固有の設定UIを表示する | P1 |
+| FR-11.2 | When コンポーネントタイプが TABLE の場合, the Report Layout UI shall テーブル固有の設定UIを表示する | P1 |
 | FR-12.3 | When コンポーネントタイプが CHART の場合, the Report Layout UI shall チャート固有の設定UIを表示する | P1 |
 | FR-12.4 | When コンポーネントタイプが SUBMISSION_DISPLAY の場合, the Report Layout UI shall 部門報告表示固有の設定UIを表示する | P1 |
 | FR-12.5 | When コンポーネントタイプが REPORT_LINK の場合, the Report Layout UI shall リンク設定UIを表示する | P2 |
@@ -299,7 +234,7 @@
 
 ---
 
-### FR-13: config_json 設定（共通）
+### FR-12: config_json 設定（共通）
 
 **Objective:** As a システム管理者, I want コンポーネントの詳細設定をJSON形式で管理できること, so that 柔軟な表示設定が可能になる
 
@@ -326,7 +261,7 @@
 
 ---
 
-### FR-14: KPI_CARD設定
+### FR-13: KPI_CARD設定
 
 **Objective:** As a システム管理者, I want KPIカードの表示設定ができること, so that 主要指標を効果的に表示できる
 
@@ -334,15 +269,15 @@
 
 | ID | 要件 | 優先度 |
 |----|------|--------|
-| FR-14.1 | The Report Layout UI shall 表示するKPI科目を選択可能とする | P1 |
-| FR-14.2 | The Report Layout UI shall レイアウト形式（grid/list）を選択可能とする | P1 |
-| FR-14.3 | The Report Layout UI shall グリッド列数（2/3/4）を選択可能とする | P1 |
-| FR-14.4 | The Report Layout UI shall 表示項目（目標値、差異、トレンド、スパークライン）のON/OFFを設定可能とする | P2 |
-| FR-14.5 | The Report Layout UI shall 閾値による色分け（danger/warning）を設定可能とする | P2 |
+| FR-13.1 | The Report Layout UI shall 表示するKPI科目を選択可能とする | P1 |
+| FR-13.2 | The Report Layout UI shall レイアウト形式（grid/list）を選択可能とする | P1 |
+| FR-13.3 | The Report Layout UI shall グリッド列数（2/3/4）を選択可能とする | P1 |
+| FR-13.4 | The Report Layout UI shall 表示項目（目標値、差異、トレンド、スパークライン）のON/OFFを設定可能とする | P2 |
+| FR-13.5 | The Report Layout UI shall 閾値による色分け（danger/warning）を設定可能とする | P2 |
 
 ---
 
-### FR-15: TABLE設定
+### FR-14: TABLE設定
 
 **Objective:** As a システム管理者, I want テーブルの表示設定ができること, so that 予実対比等を効果的に表示できる
 
@@ -350,15 +285,15 @@
 
 | ID | 要件 | 優先度 |
 |----|------|--------|
-| FR-15.1 | The Report Layout UI shall 行軸（organization/subject/period）を選択可能とする | P1 |
-| FR-15.2 | The Report Layout UI shall 比較モード（BUDGET_VS_ACTUAL, BUDGET_VS_ACTUAL_FORECAST等）を選択可能とする | P1 |
-| FR-15.3 | The Report Layout UI shall 表示列（budget, actual, forecast, variance, varianceRate）を選択可能とする | P1 |
-| FR-15.4 | The Report Layout UI shall 合計行・小計行の表示ON/OFFを設定可能とする | P2 |
-| FR-15.5 | The Report Layout UI shall 差異ハイライトのON/OFFを設定可能とする | P2 |
+| FR-14.1 | The Report Layout UI shall 行軸（organization/subject/period）を選択可能とする | P1 |
+| FR-14.2 | The Report Layout UI shall 比較モード（BUDGET_VS_ACTUAL, BUDGET_VS_ACTUAL_FORECAST等）を選択可能とする | P1 |
+| FR-14.3 | The Report Layout UI shall 表示列（budget, actual, forecast, variance, varianceRate）を選択可能とする | P1 |
+| FR-14.4 | The Report Layout UI shall 合計行・小計行の表示ON/OFFを設定可能とする | P2 |
+| FR-14.5 | The Report Layout UI shall 差異ハイライトのON/OFFを設定可能とする | P2 |
 
 ---
 
-### FR-16: CHART設定
+### FR-15: CHART設定
 
 **Objective:** As a システム管理者, I want チャートの表示設定ができること, so that グラフを効果的に表示できる
 
@@ -366,14 +301,14 @@
 
 | ID | 要件 | 優先度 |
 |----|------|--------|
-| FR-16.1 | The Report Layout UI shall チャートタイプ（waterfall/bar/line/area/pie/donut）を選択可能とする | P1 |
-| FR-16.2 | The Report Layout UI shall X軸（period/organization/subject）を選択可能とする | P1 |
-| FR-16.3 | The Report Layout UI shall 凡例・データラベル・グリッド線の表示ON/OFFを設定可能とする | P2 |
-| FR-16.4 | When チャートタイプが waterfall の場合, the Report Layout UI shall 開始/終了ラベルと色設定を入力可能とする | P2 |
+| FR-15.1 | The Report Layout UI shall チャートタイプ（waterfall/bar/line/area/pie/donut）を選択可能とする | P1 |
+| FR-15.2 | The Report Layout UI shall X軸（period/organization/subject）を選択可能とする | P1 |
+| FR-15.3 | The Report Layout UI shall 凡例・データラベル・グリッド線の表示ON/OFFを設定可能とする | P2 |
+| FR-15.4 | When チャートタイプが waterfall の場合, the Report Layout UI shall 開始/終了ラベルと色設定を入力可能とする | P2 |
 
 ---
 
-### FR-17: コンポーネント編集
+### FR-16: コンポーネント編集
 
 **Objective:** As a システム管理者, I want コンポーネント情報を編集できること, so that 表示内容を調整できる
 
@@ -381,14 +316,14 @@
 
 | ID | 要件 | 優先度 |
 |----|------|--------|
-| FR-17.1 | When ユーザーがコンポーネント情報を編集して更新を実行した時, the Report Layout Service shall 対象コンポーネントのレコードを更新する | P1 |
-| FR-17.2 | If 更新対象のコンポーネントが存在しない場合, the Report Layout Service shall 「コンポーネントが見つかりません」エラーを返す | P1 |
-| FR-17.3 | When コンポーネントタイプを変更した時, the Report Layout Service shall config_json をリセットする | P2 |
-| FR-17.4 | The Report Layout Service shall 更新時に updated_at を記録する | P1 |
+| FR-16.1 | When ユーザーがコンポーネント情報を編集して更新を実行した時, the Report Layout Service shall 対象コンポーネントのレコードを更新する | P1 |
+| FR-16.2 | If 更新対象のコンポーネントが存在しない場合, the Report Layout Service shall 「コンポーネントが見つかりません」エラーを返す | P1 |
+| FR-16.3 | When コンポーネントタイプを変更した時, the Report Layout Service shall config_json をリセットする | P2 |
+| FR-16.4 | The Report Layout Service shall 更新時に updated_at を記録する | P1 |
 
 ---
 
-### FR-18: コンポーネント削除
+### FR-17: コンポーネント削除
 
 **Objective:** As a システム管理者, I want コンポーネントを削除できること, so that 不要なコンポーネントを除外できる
 
@@ -396,13 +331,13 @@
 
 | ID | 要件 | 優先度 |
 |----|------|--------|
-| FR-18.1 | When ユーザーがコンポーネントの削除ボタンを押した時, the Report Layout UI shall 確認ダイアログを表示する | P1 |
-| FR-18.2 | When ユーザーが確認ダイアログで「削除」を選択した時, the Report Layout Service shall 対象コンポーネントのレコードを物理削除する | P1 |
-| FR-18.3 | If 削除対象のコンポーネントが存在しない場合, the Report Layout Service shall 「コンポーネントが見つかりません」エラーを返す | P1 |
+| FR-17.1 | When ユーザーがコンポーネントの削除ボタンを押した時, the Report Layout UI shall 確認ダイアログを表示する | P1 |
+| FR-17.2 | When ユーザーが確認ダイアログで「削除」を選択した時, the Report Layout Service shall 対象コンポーネントのレコードを物理削除する | P1 |
+| FR-17.3 | If 削除対象のコンポーネントが存在しない場合, the Report Layout Service shall 「コンポーネントが見つかりません」エラーを返す | P1 |
 
 ---
 
-### FR-19: コンポーネント並べ替え
+### FR-18: コンポーネント並べ替え
 
 **Objective:** As a システム管理者, I want コンポーネントの順序をドラッグ＆ドロップで変更できること, so that 表示順序を直感的に編集できる
 
@@ -410,14 +345,14 @@
 
 | ID | 要件 | 優先度 |
 |----|------|--------|
-| FR-19.1 | When ユーザーがコンポーネントをドラッグして別の位置にドロップした時, the Report Layout Service shall 対象コンポーネントの sort_order を更新して順序を変更する | P1 |
-| FR-19.2 | The Report Layout UI shall ドラッグ中にドロップ可能な位置を視覚的に示す | P1 |
-| FR-19.3 | When 並べ替えが完了した時, the Report Layout Service shall 影響を受けたコンポーネントの sort_order を再計算する | P1 |
-| FR-19.4 | The Report Layout Service shall ページ間でのコンポーネント移動は不可とする（同一ページ内のみ） | P1 |
+| FR-18.1 | When ユーザーがコンポーネントをドラッグして別の位置にドロップした時, the Report Layout Service shall 対象コンポーネントの sort_order を更新して順序を変更する | P1 |
+| FR-18.2 | The Report Layout UI shall ドラッグ中にドロップ可能な位置を視覚的に示す | P1 |
+| FR-18.3 | When 並べ替えが完了した時, the Report Layout Service shall 影響を受けたコンポーネントの sort_order を再計算する | P1 |
+| FR-18.4 | The Report Layout Service shall ダッシュボード内でのコンポーネント移動のみ許可する | P1 |
 
 ---
 
-### FR-20: レイアウトプレビュー
+### FR-19: レイアウトプレビュー
 
 **Objective:** As a システム管理者, I want 設定したレイアウトをプレビューできること, so that 実際の表示イメージを確認できる
 
@@ -425,26 +360,25 @@
 
 | ID | 要件 | 優先度 |
 |----|------|--------|
-| FR-20.1 | When ユーザーがプレビュー表示を実行した時, the Report Layout UI shall レイアウトを実際のレポート画面と同じ構成で表示する | P1 |
-| FR-20.2 | The Report Layout UI shall ページ（タブ）切り替えをプレビュー内で動作させる | P1 |
-| FR-20.3 | The Report Layout UI shall 各コンポーネントをサンプルデータで表示する | P1 |
-| FR-20.4 | The Report Layout UI shall コンポーネントの幅（FULL/HALF/THIRD）を実際のレイアウトで表示する | P1 |
-| FR-20.5 | When プレビューモードの場合, the Report Layout UI shall モックデータを使用する（実データは使用しない） | P1 |
+| FR-19.1 | When ユーザーがプレビュー表示を実行した時, the Report Layout UI shall ダッシュボードを実際のレポート画面と同じ構成で表示する | P1 |
+| FR-19.2 | The Report Layout UI shall 各コンポーネントをサンプルデータで表示する | P1 |
+| FR-19.3 | The Report Layout UI shall コンポーネントの幅（FULL/HALF/THIRD）を実際のレイアウトで表示する | P1 |
+| FR-19.4 | When プレビューモードの場合, the Report Layout UI shall モックデータを使用する（実データは使用しない） | P1 |
 
 ---
 
-### FR-21: 標準テンプレート
+### FR-20: 標準テンプレート
 
-**Objective:** As a システム管理者, I want 標準テンプレートからレイアウトを初期化できること, so that 一般的なレイアウト構成を効率的に作成できる
+**Objective:** As a システム管理者, I want 標準テンプレートからレイアウトを初期化できること, so that 一般的なダッシュボード構成を効率的に作成できる
 
 #### Acceptance Criteria
 
 | ID | 要件 | 優先度 |
 |----|------|--------|
-| FR-21.1 | When 会議種別にレイアウトが未定義の場合, the Report Layout UI shall 「テンプレートから作成」ボタンを表示する | P2 |
-| FR-21.2 | When ユーザーがテンプレート選択を実行した時, the Report Layout UI shall 利用可能なテンプレート一覧を表示する | P2 |
-| FR-21.3 | When ユーザーがテンプレートを選択した時, the Report Layout Service shall テンプレートのレイアウト・ページ・コンポーネントを複製して作成する | P2 |
-| FR-21.4 | The Report Layout Service shall 「月次経営会議レイアウト」標準テンプレートを提供する | P2 |
+| FR-20.1 | When 会議種別にレイアウトが未定義の場合, the Report Layout UI shall 「テンプレートから作成」ボタンを表示する | P2 |
+| FR-20.2 | When ユーザーがテンプレート選択を実行した時, the Report Layout UI shall 利用可能なテンプレート一覧を表示する | P2 |
+| FR-20.3 | When ユーザーがテンプレートを選択した時, the Report Layout Service shall テンプレートのレイアウト・ページ・コンポーネントを複製して作成する | P2 |
+| FR-20.4 | The Report Layout Service shall 「月次経営会議ダッシュボード」標準テンプレートを提供する | P2 |
 
 **月次経営会議レイアウトテンプレート構成**:
 

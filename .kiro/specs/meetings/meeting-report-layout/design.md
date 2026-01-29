@@ -47,14 +47,14 @@
 
 ## Overview
 
-レポートレイアウト設定（A4）は、会議種別ごとに経営層が閲覧する「レポート」の表示構成を定義する管理画面である。
+レポートレイアウト設定（A4）は、会議種別ごとに経営層が閲覧する「ダッシュボード」の表示構成を定義する管理画面である。
 
-3階層構造で管理：
-- **レイアウト**: レポート全体の構成（1会議種別に複数可、デフォルトは1つ）
-- **ページ**: タブとして表示される単位（FIXED/PER_DEPARTMENT/PER_BU）
+シンプルな2階層構造：
+- **レイアウト**: 会議種別ごとに1つ定義（ダッシュボード全体の構成）
 - **コンポーネント**: 表・グラフ・カード等の表示要素（config_jsonで詳細設定）
+- **ページ**: システム自動管理（ユーザーは編集不可。pageCode='DASHBOARD'で固定）
 
-ドラッグ＆ドロップによる並べ替え機能を提供し、直感的なレイアウト編集を可能にする。
+ドラッグ＆ドロップによるコンポーネント並べ替え機能を提供し、直感的なダッシュボード編集を可能にする。
 
 ---
 
@@ -81,14 +81,15 @@
 │                                                                          │
 │  ┌──────────────────────────────────────────────────────────────────┐   │
 │  │ LayoutSettingsPage                                                │   │
-│  │ レポートレイアウト設定画面                                        │   │
+│  │ ダッシュボード設定画面                                            │   │
 │  │                                                                   │   │
 │  │ ┌─────────────────┐  ┌────────────────────────────────────────┐ │   │
 │  │ │ LayoutTree      │  │ DetailPanel                            │ │   │
-│  │ │ レイアウト      │  │ レイアウト/ページ/コンポーネント詳細   │ │   │
-│  │ │  └─ ページ      │  │                                        │ │   │
-│  │ │     └─ コンポ   │  │ ┌────────────────────────────────────┐ │ │   │
-│  │ │ (DnD対応)       │  │ │ ComponentConfigPanel               │ │ │   │
+│  │ │ レイアウト      │  │ レイアウト/コンポーネント詳細         │ │   │
+│  │ │  └─ ページ*     │  │ (*システム管理/表示のみ)              │ │   │
+│  │ │     └─ コンポ   │  │                                        │ │   │
+│  │ │ (DnD対応)       │  │ ┌────────────────────────────────────┐ │ │   │
+│  │ │                 │  │ │ ComponentConfigPanel               │ │ │   │
 │  │ │                 │  │ │ コンポーネントタイプ別設定UI       │ │ │   │
 │  │ └─────────────────┘  │ └────────────────────────────────────┘ │ │   │
 │  │                      └────────────────────────────────────────┘ │   │
@@ -137,15 +138,17 @@
 | DELETE | `/bff/meetings/report-layouts/:id` | レイアウト削除 | - | void |
 | PUT | `/bff/meetings/report-layouts/reorder` | レイアウト並べ替え | ReorderLayoutsDto | ReportLayoutListDto |
 
-#### Page Endpoints
+#### Page Endpoints（システム管理）
 
-| Method | Endpoint | Purpose | Request DTO | Response DTO |
-|--------|----------|---------|-------------|--------------|
-| GET | `/bff/meetings/report-pages/:layoutId` | ページ一覧取得 | - | ReportPageListDto |
-| POST | `/bff/meetings/report-pages` | ページ作成 | CreateReportPageDto | ReportPageDto |
-| PUT | `/bff/meetings/report-pages/:id` | ページ更新 | UpdateReportPageDto | ReportPageDto |
-| DELETE | `/bff/meetings/report-pages/:id` | ページ削除 | - | void |
-| PUT | `/bff/meetings/report-pages/reorder` | ページ並べ替え | ReorderPagesDto | ReportPageListDto |
+ページはシステム自動管理です。以下のエンドポイントは存在しますがユーザー操作をブロックします。
+
+| Method | Endpoint | Purpose | Response | 制約 |
+|--------|----------|---------|----------|------|
+| GET | `/bff/meetings/report-pages/:layoutId` | ページ一覧取得 | ReportPageListDto | **読み取り専用** |
+| POST | `/bff/meetings/report-pages` | ページ作成（禁止） | 409 Conflict | **ブロック** - "ページは自動管理されています" |
+| PUT | `/bff/meetings/report-pages/:id` | ページ更新（禁止） | 422 Unprocessable | **ブロック** - "ページはシステム管理されています" |
+| DELETE | `/bff/meetings/report-pages/:id` | ページ削除（禁止） | 422 Unprocessable | **ブロック** - "レイアウトを削除してください" |
+| PUT | `/bff/meetings/report-pages/reorder` | ページ並べ替え（禁止） | 422 Unprocessable | **ブロック** - 並べ替え不可 |
 
 #### Component Endpoints
 
@@ -163,6 +166,34 @@
 |--------|----------|---------|-------------|--------------|
 | GET | `/bff/meetings/report-layout-templates` | テンプレート一覧取得 | - | LayoutTemplateListDto |
 | POST | `/bff/meetings/report-layouts/from-template` | テンプレートからレイアウト作成 | CreateLayoutFromTemplateDto | ReportLayoutDto |
+
+**Constraint Validation Rules（必須・BFF Service層で実装）**
+
+**CreateReportLayout時の処理**:
+```
+1. Check: SELECT COUNT(*) FROM meeting_report_layouts
+         WHERE tenant_id = ? AND meeting_type_id = ?
+   - If count > 0: throw ReportLayoutDuplicateError(409)
+     "この会議種別には既にレイアウトが存在します"
+
+2. Insert layout with is_default=true
+
+3. Auto-create page:
+   {
+     layoutId: <new_layout_id>,
+     pageCode: 'DASHBOARD',
+     pageName: 'ダッシュボード設定',
+     pageType: 'FIXED',
+     sortOrder: 10,
+     isActive: true
+   }
+```
+
+**Page CRUD操作のブロック**:
+- `POST /report-pages`: 409 Conflict - "ページは自動管理されています"
+- `PUT /report-pages/:id`: 422 Unprocessable - "ページはシステム管理されています"
+- `DELETE /report-pages/:id`: 422 Unprocessable - "レイアウトを削除してください"
+- `GET /report-pages`: ✅ 許可（読み取り専用）
 
 **Template Storage（テンプレート保存場所）**
 - **Phase 1（UI-MOCK）**: `MockBffClient` 内で「月次経営会議レイアウト」テンプレートをハードコード定義
@@ -686,11 +717,15 @@ export function isChartConfig(config: ComponentConfig): config is ChartConfig {
 未記載の責務は実装してはならない。
 
 ### UIの責務
-- レイアウト・ページ・コンポーネントの一覧表示、詳細表示
-- 階層構造のツリー表示
+- レイアウト・コンポーネントの一覧表示、詳細表示
+- ページはシステム管理（読み取り専用、樹表示のみ）
+  - ページノードは非アクティブ（グレーアウト、クリック不可）
+  - ツールチップで "ダッシュボード設定（システム管理）" を表示
+  - ページCRUD UI は削除（create-page-dialog.tsx, page-detail-panel.tsx, page-reorder-controls.tsx）
+- 階層構造のツリー表示（レイアウト → ページ（読み取り専用）→ コンポーネント）
 - フォーム入力制御・UX最適化（コンポーネントタイプ別設定UI）
-- ドラッグ＆ドロップ並べ替え UI
-- プレビュー表示（レイアウトの見た目確認）
+- コンポーネント並べ替え UI（ダッシュボード内のみ）
+- プレビュー表示（ダッシュボードの見た目確認）
 - 確認ダイアログ表示（削除時）
 - ビジネス判断は禁止
 
@@ -723,6 +758,20 @@ export function isChartConfig(config: ComponentConfig): config is ChartConfig {
 | ビジネスルール | エンティティ補足のルールがServiceに反映: ✅ |
 | NULL許可 | NULL/NOT NULLが必須/optional に正しく対応: ✅ |
 
+### Database Constraints（Phase 2 で追加）
+
+**MeetingReportLayout Constraints**:
+```prisma
+@@unique([tenantId, meetingTypeId]) // 1 レイアウト per meeting type
+```
+
+**MeetingReportPage Constraints**:
+```prisma
+@@unique([tenantId, layoutId])      // 1 ページ per layout
+@@check([pageType = 'FIXED'])       // pageType は常に 'FIXED'
+@@check([pageCode = 'DASHBOARD'])   // pageCode は常に 'DASHBOARD'
+```
+
 ### Prisma Schema（Phase 2 で追加）
 
 ```prisma
@@ -733,7 +782,7 @@ model MeetingReportLayout {
   layoutCode     String   @map("layout_code") @db.VarChar(50)
   layoutName     String   @map("layout_name") @db.VarChar(200)
   description    String?  @db.Text
-  isDefault      Boolean  @map("is_default") @default(false)
+  isDefault      Boolean  @map("is_default") @default(true) // 常に true
   sortOrder      Int      @map("sort_order")
   isActive       Boolean  @map("is_active") @default(true)
   createdAt      DateTime @map("created_at") @default(now())
@@ -744,7 +793,7 @@ model MeetingReportLayout {
   meetingType    MeetingType          @relation(fields: [tenantId, meetingTypeId], references: [tenantId, id])
   pages          MeetingReportPage[]
 
-  @@unique([tenantId, meetingTypeId, layoutCode])
+  @@unique([tenantId, meetingTypeId]) // 1 レイアウト per 会議種別
   @@map("meeting_report_layouts")
 }
 
@@ -752,10 +801,9 @@ model MeetingReportPage {
   id                 String   @id @default(uuid())
   tenantId           String   @map("tenant_id")
   layoutId           String   @map("layout_id")
-  pageCode           String   @map("page_code") @db.VarChar(50)
-  pageName           String   @map("page_name") @db.VarChar(200)
-  pageType           String   @map("page_type") @db.VarChar(20)
-  expandDimensionId  String?  @map("expand_dimension_id")
+  pageCode           String   @map("page_code") @db.VarChar(50) // 常に 'DASHBOARD'
+  pageName           String   @map("page_name") @db.VarChar(200) // "ダッシュボード設定"
+  pageType           String   @map("page_type") @db.VarChar(20)  // 常に 'FIXED'
   sortOrder          Int      @map("sort_order")
   isActive           Boolean  @map("is_active") @default(true)
   createdAt          DateTime @map("created_at") @default(now())
@@ -764,7 +812,7 @@ model MeetingReportPage {
   layout             MeetingReportLayout     @relation(fields: [tenantId, layoutId], references: [tenantId, id], onDelete: Cascade)
   components         MeetingReportComponent[]
 
-  @@unique([tenantId, layoutId, pageCode])
+  @@unique([tenantId, layoutId]) // 1 ページ per レイアウト
   @@map("meeting_report_pages")
 }
 
