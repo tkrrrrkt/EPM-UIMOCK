@@ -117,7 +117,7 @@ export function LayoutPreviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] h-[90vh] flex flex-col p-0">
+      <DialogContent className="w-[95vw] h-[90vh] flex flex-col p-0 max-w-none sm:max-w-[95vw]">
         {/* Header */}
         <DialogHeader className="px-6 py-4 border-b">
           <div className="flex items-center justify-between">

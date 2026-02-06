@@ -28,3 +28,6 @@ export * from './DashboardAccessDeniedError';
 export * from './DashboardDeleteForbiddenError';
 export * from './WidgetDataError';
 export * from './InvalidFilterConfigError';
+
+// 多次元分析機能
+export * from './multidim-analysis';

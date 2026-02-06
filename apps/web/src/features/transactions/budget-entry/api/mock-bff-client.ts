@@ -21,6 +21,12 @@ import type {
   BffBudgetCompareResponse,
   ScenarioType,
   PlanVersionStatus,
+  BffBudgetAllocationEvent,
+  BffListBudgetAllocationEventsResponse,
+  BffExecuteBudgetAllocationRequest,
+  BffExecuteBudgetAllocationResponse,
+  BffBudgetAllocationStatus,
+  BffBudgetAllocationResultResponse,
 } from "@epm/contracts/bff/budget-entry"
 
 // Mock data
@@ -35,6 +41,9 @@ const mockEvents: BffPlanEventSummary[] = [
     latestVersionName: "第2回",
     latestVersionStatus: "DRAFT",
     updatedAt: "2026-01-10T09:00:00Z",
+    allocationStatus: "NOT_EXECUTED",
+    allocationExecutedAt: null,
+    allocationExecutedBy: null,
   },
   {
     id: "pe-002",
@@ -46,6 +55,9 @@ const mockEvents: BffPlanEventSummary[] = [
     latestVersionName: "第1回",
     latestVersionStatus: "DRAFT",
     updatedAt: "2026-01-08T14:30:00Z",
+    allocationStatus: "NOT_EXECUTED",
+    allocationExecutedAt: null,
+    allocationExecutedBy: null,
   },
   {
     id: "pe-003",
@@ -57,6 +69,9 @@ const mockEvents: BffPlanEventSummary[] = [
     latestVersionName: "FIXED",
     latestVersionStatus: "FIXED",
     updatedAt: "2025-04-01T10:00:00Z",
+    allocationStatus: "EXECUTED",
+    allocationExecutedAt: "2025-03-15T10:30:00Z",
+    allocationExecutedBy: "経理部 山田太郎",
   },
   {
     id: "pe-004",
@@ -68,6 +83,9 @@ const mockEvents: BffPlanEventSummary[] = [
     latestVersionName: "FIXED",
     latestVersionStatus: "FIXED",
     updatedAt: "2025-10-15T16:00:00Z",
+    allocationStatus: "EXECUTED",
+    allocationExecutedAt: "2025-10-10T14:00:00Z",
+    allocationExecutedBy: "経理部 鈴木一郎",
   },
 ]
 
@@ -82,6 +100,59 @@ const mockDepartments: BffDepartmentSummary[] = [
   { id: "dept-003", departmentCode: "DEV1", departmentName: "開発1課" },
   { id: "dept-004", departmentCode: "DEV2", departmentName: "開発2課" },
   { id: "dept-005", departmentCode: "ADMIN", departmentName: "管理部" },
+]
+
+// Mock allocation events for BUDGET scenario
+const mockBudgetAllocationEvents: BffBudgetAllocationEvent[] = [
+  {
+    id: "ae-budget-001",
+    eventCode: "BUDGET_ALLOC_001",
+    eventName: "予算_間接費配賦",
+    scenarioType: "BUDGET",
+    executionOrder: 1,
+    stepCount: 3,
+    isActive: true,
+  },
+  {
+    id: "ae-budget-002",
+    eventCode: "BUDGET_ALLOC_002",
+    eventName: "予算_製造間接費配賦",
+    scenarioType: "BUDGET",
+    executionOrder: 2,
+    stepCount: 2,
+    isActive: true,
+  },
+  {
+    id: "ae-budget-003",
+    eventCode: "BUDGET_ALLOC_003",
+    eventName: "予算_本社経費配賦",
+    scenarioType: "BUDGET",
+    executionOrder: 3,
+    stepCount: 4,
+    isActive: false,
+  },
+]
+
+// Mock allocation events for FORECAST scenario
+const mockForecastAllocationEvents: BffBudgetAllocationEvent[] = [
+  {
+    id: "ae-forecast-001",
+    eventCode: "FORECAST_ALLOC_001",
+    eventName: "見込_間接費配賦",
+    scenarioType: "FORECAST",
+    executionOrder: 1,
+    stepCount: 3,
+    isActive: true,
+  },
+  {
+    id: "ae-forecast-002",
+    eventCode: "FORECAST_ALLOC_002",
+    eventName: "見込_製造間接費配賦",
+    scenarioType: "FORECAST",
+    executionOrder: 2,
+    stepCount: 2,
+    isActive: true,
+  },
 ]
 
 export class MockBffClient implements BffClient {
@@ -325,6 +396,147 @@ export class MockBffClient implements BffClient {
     await this.delay(300)
     // Stub - will be implemented in Phase 2
     throw new Error("Not implemented")
+  }
+
+  // ============================================
+  // Allocation operations
+  // ============================================
+
+  async listAllocationEvents(planEventId: string): Promise<BffListBudgetAllocationEventsResponse> {
+    await this.delay(300)
+
+    const event = this.events.find((e) => e.id === planEventId)
+    if (!event) {
+      throw new Error("BUDGET_EVENT_NOT_FOUND")
+    }
+
+    // Return allocation events based on scenario type
+    let events: BffBudgetAllocationEvent[] = []
+    if (event.scenarioType === "BUDGET") {
+      events = [...mockBudgetAllocationEvents]
+    } else if (event.scenarioType === "FORECAST") {
+      events = [...mockForecastAllocationEvents]
+    }
+
+    return { events }
+  }
+
+  async executeAllocation(request: BffExecuteBudgetAllocationRequest): Promise<BffExecuteBudgetAllocationResponse> {
+    await this.delay(1500) // Simulate processing time
+
+    const event = this.events.find((e) => e.id === request.planEventId)
+    if (!event) {
+      throw new Error("BUDGET_EVENT_NOT_FOUND")
+    }
+
+    // Get allocation events
+    let allocationEvents: BffBudgetAllocationEvent[] = []
+    if (event.scenarioType === "BUDGET") {
+      allocationEvents = mockBudgetAllocationEvents
+    } else if (event.scenarioType === "FORECAST") {
+      allocationEvents = mockForecastAllocationEvents
+    }
+
+    // Filter selected events
+    const selectedEvents = allocationEvents.filter((e) => request.allocationEventIds.includes(e.id))
+
+    // Generate mock results
+    const results = selectedEvents.map((e) => ({
+      eventId: e.id,
+      eventName: e.eventName,
+      status: "SUCCESS" as const,
+      stepCount: e.stepCount,
+      detailCount: Math.floor(Math.random() * 50) + 10,
+      totalAllocatedAmount: Math.floor(Math.random() * 10000000) + 1000000,
+    }))
+
+    return {
+      success: true,
+      executionIds: results.map((r) => `exec-${r.eventId}-${Date.now()}`),
+      results,
+    }
+  }
+
+  async getAllocationStatus(planEventId: string): Promise<BffBudgetAllocationStatus> {
+    await this.delay(200)
+
+    const event = this.events.find((e) => e.id === planEventId)
+    if (!event) {
+      throw new Error("BUDGET_EVENT_NOT_FOUND")
+    }
+
+    return {
+      hasAllocationResult: event.allocationStatus === "EXECUTED",
+      lastExecutedAt: event.allocationExecutedAt,
+      lastExecutedBy: event.allocationExecutedBy,
+    }
+  }
+
+  async getAllocationResult(planEventId: string, planVersionId?: string): Promise<BffBudgetAllocationResultResponse> {
+    await this.delay(300)
+
+    const event = this.events.find((e) => e.id === planEventId)
+    if (!event) {
+      throw new Error("BUDGET_EVENT_NOT_FOUND")
+    }
+
+    if (event.allocationStatus !== "EXECUTED") {
+      return {
+        planEventId: event.id,
+        planEventName: event.eventName,
+        planVersionId: planVersionId || "pv-001",
+        planVersionName: event.latestVersionName,
+        executions: [],
+      }
+    }
+
+    // Get allocation events
+    let allocationEvents: BffBudgetAllocationEvent[] = []
+    if (event.scenarioType === "BUDGET") {
+      allocationEvents = mockBudgetAllocationEvents.filter((e) => e.isActive)
+    } else if (event.scenarioType === "FORECAST") {
+      allocationEvents = mockForecastAllocationEvents.filter((e) => e.isActive)
+    }
+
+    // Generate mock result data
+    const executions = allocationEvents.map((allocEvent, index) => ({
+      executionId: `exec-${allocEvent.id}-${Date.now()}`,
+      eventId: allocEvent.id,
+      eventName: allocEvent.eventName,
+      executedAt: event.allocationExecutedAt || new Date().toISOString(),
+      executedBy: event.allocationExecutedBy || "システム",
+      status: "SUCCESS" as const,
+      steps: Array.from({ length: allocEvent.stepCount }, (_, stepIdx) => ({
+        stepId: `step-${allocEvent.id}-${stepIdx + 1}`,
+        stepNo: stepIdx + 1,
+        stepName: `配賦ステップ${stepIdx + 1}`,
+        fromSubjectCode: `${6000 + stepIdx}`,
+        fromSubjectName: `間接費${stepIdx + 1}`,
+        fromDepartmentCode: "COMMON",
+        fromDepartmentName: "共通部門",
+        sourceAmount: Math.floor(Math.random() * 5000000) + 1000000,
+        details: mockDepartments.slice(0, 3).map((dept, detailIdx) => ({
+          detailId: `detail-${allocEvent.id}-${stepIdx + 1}-${detailIdx + 1}`,
+          targetType: "DEPARTMENT" as const,
+          targetCode: dept.departmentCode,
+          targetName: dept.departmentName,
+          toSubjectCode: `${4000 + stepIdx}`,
+          toSubjectName: `製造原価${stepIdx + 1}`,
+          driverType: "HEADCOUNT",
+          driverValue: Math.floor(Math.random() * 50) + 10,
+          ratio: Number((1 / 3).toFixed(4)),
+          allocatedAmount: Math.floor(Math.random() * 1000000) + 100000,
+        })),
+      })),
+    }))
+
+    return {
+      planEventId: event.id,
+      planEventName: event.eventName,
+      planVersionId: planVersionId || "pv-001",
+      planVersionName: event.latestVersionName,
+      executions,
+    }
   }
 
   private delay(ms: number): Promise<void> {

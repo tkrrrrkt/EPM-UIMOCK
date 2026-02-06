@@ -22,6 +22,10 @@ import type {
   BffDepartmentNode,
   BffKpiDefinitionOption,
   BffKpiDefinitionOptionListDto,
+  BffSubjectSelectorOption,
+  BffSubjectSelectorResponse,
+  BffMetricSelectorOption,
+  BffMetricSelectorResponse,
 } from '@epm/contracts/bff/dashboard';
 import type {
   ApiDashboardDto,
@@ -35,6 +39,10 @@ import type {
   ApiDepartmentNode,
   ApiKpiDefinitionOption,
   ApiKpiDefinitionOptionListDto,
+  ApiSubjectSelectorOption,
+  ApiSubjectSelectorResponse,
+  ApiMetricSelectorOption,
+  ApiMetricSelectorResponse,
 } from '@epm/contracts/api/dashboard';
 
 export const DashboardMapper = {
@@ -217,6 +225,50 @@ export const DashboardMapper = {
   ): BffKpiDefinitionOptionListDto {
     return {
       items: api.items.map((item) => DashboardMapper.toKpiDefinitionOption(item)),
+    };
+  },
+
+  /**
+   * Map API Subject Selector Option to BFF Option
+   */
+  toSubjectSelectorOption(api: ApiSubjectSelectorOption): BffSubjectSelectorOption {
+    return {
+      stableId: api.stableId,
+      subjectCode: api.subjectCode,
+      subjectName: api.subjectName,
+      parentStableId: api.parentStableId,
+      level: api.level,
+    };
+  },
+
+  /**
+   * Map API Subject Selector Response to BFF Response
+   */
+  toSubjectSelectorResponse(api: ApiSubjectSelectorResponse): BffSubjectSelectorResponse {
+    return {
+      items: api.items.map((item) => DashboardMapper.toSubjectSelectorOption(item)),
+    };
+  },
+
+  /**
+   * Map API Metric Selector Option to BFF Option
+   */
+  toMetricSelectorOption(api: ApiMetricSelectorOption): BffMetricSelectorOption {
+    return {
+      id: api.id,
+      metricCode: api.metricCode,
+      metricName: api.metricName,
+      metricType: api.metricType,
+      unit: api.unit,
+    };
+  },
+
+  /**
+   * Map API Metric Selector Response to BFF Response
+   */
+  toMetricSelectorResponse(api: ApiMetricSelectorResponse): BffMetricSelectorResponse {
+    return {
+      items: api.items.map((item) => DashboardMapper.toMetricSelectorOption(item)),
     };
   },
 };

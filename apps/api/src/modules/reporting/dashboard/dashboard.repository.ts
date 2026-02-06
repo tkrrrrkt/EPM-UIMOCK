@@ -323,4 +323,66 @@ export class DashboardRepository {
       updatedAt: widget.updated_at.toISOString(),
     };
   }
+
+  /**
+   * 科目（財務）選択肢取得
+   * テナントでフィルター、有効な科目のみ
+   */
+  async getActiveSubjects(tenantId: string, companyId: string) {
+    await this.prisma.setTenantContext(tenantId);
+
+    const subjects = await this.prisma.subjects.findMany({
+      where: {
+        tenant_id: tenantId,
+        is_active: true,
+      },
+      select: {
+        id: true,
+        subject_code: true,
+        subject_name: true,
+      },
+      orderBy: {
+        subject_code: 'asc',
+      },
+    });
+
+    return subjects.map((s: any) => ({
+      stableId: s.id,
+      subjectCode: s.subject_code,
+      subjectName: s.subject_name,
+      parentStableId: null,
+      level: 1,
+    }));
+  }
+
+  /**
+   * 指標（メトリクス）選択肢取得
+   * テナントでフィルター、有効な指標のみ
+   */
+  async getActiveMetrics(tenantId: string, companyId: string) {
+    await this.prisma.setTenantContext(tenantId);
+
+    const metrics = await this.prisma.metrics.findMany({
+      where: {
+        tenant_id: tenantId,
+        is_active: true,
+      },
+      select: {
+        id: true,
+        metric_code: true,
+        metric_name: true,
+      },
+      orderBy: {
+        metric_code: 'asc',
+      },
+    });
+
+    return metrics.map((m: any) => ({
+      id: m.id,
+      metricCode: m.metric_code,
+      metricName: m.metric_name,
+      metricType: 'KPI_METRIC' as const,
+      unit: null,
+    }));
+  }
 }

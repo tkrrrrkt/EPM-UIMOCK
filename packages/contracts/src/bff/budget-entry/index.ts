@@ -35,6 +35,10 @@ export interface BffPlanEventSummary {
   latestVersionName: string
   latestVersionStatus: PlanVersionStatus
   updatedAt: string
+  // 配賦情報
+  allocationStatus: 'NOT_EXECUTED' | 'EXECUTED' | 'N/A'  // N/A for ACTUAL
+  allocationExecutedAt: string | null
+  allocationExecutedBy: string | null
 }
 
 export interface BffListPlanEventsResponse {
@@ -385,4 +389,123 @@ export interface BudgetEntryError {
   code: BudgetEntryErrorCode
   message: string
   details?: Record<string, unknown>
+}
+
+// ============================================
+// Budget Allocation DTOs (予算配賦処理用)
+// ============================================
+
+export interface BffBudgetAllocationEvent {
+  id: string
+  eventCode: string
+  eventName: string
+  scenarioType: 'BUDGET' | 'FORECAST'
+  executionOrder: number
+  stepCount: number
+  isActive: boolean
+}
+
+export interface BffListBudgetAllocationEventsRequest {
+  planEventId: string
+}
+
+export interface BffListBudgetAllocationEventsResponse {
+  events: BffBudgetAllocationEvent[]
+}
+
+export interface BffExecuteBudgetAllocationRequest {
+  planEventId: string
+  planVersionId: string
+  allocationEventIds: string[]  // 実行する配賦イベントID（execution_order順）
+}
+
+export interface BffBudgetAllocationEventResult {
+  eventId: string
+  eventName: string
+  status: 'SUCCESS' | 'FAILED'
+  stepCount: number
+  detailCount: number
+  totalAllocatedAmount: number
+  errorMessage?: string
+}
+
+export interface BffExecuteBudgetAllocationResponse {
+  success: boolean
+  executionIds: string[]
+  results: BffBudgetAllocationEventResult[]
+  errorMessage?: string
+}
+
+export interface BffBudgetAllocationStatus {
+  hasAllocationResult: boolean
+  lastExecutedAt: string | null
+  lastExecutedBy: string | null
+}
+
+// ============================================
+// Budget Allocation Result DTOs (予算配賦結果VIEW用)
+// ============================================
+
+export interface BffBudgetAllocationResultRequest {
+  planEventId: string
+  planVersionId?: string
+}
+
+export interface BffBudgetAllocationExecution {
+  executionId: string
+  eventId: string
+  eventName: string
+  executedAt: string
+  executedBy: string
+  status: 'SUCCESS' | 'FAILED'
+  steps: BffBudgetAllocationStepResult[]
+}
+
+export interface BffBudgetAllocationStepResult {
+  stepId: string
+  stepNo: number
+  stepName: string
+  fromSubjectCode: string
+  fromSubjectName: string
+  fromDepartmentCode: string
+  fromDepartmentName: string
+  sourceAmount: number
+  details: BffBudgetAllocationDetail[]
+}
+
+export interface BffBudgetAllocationDetail {
+  detailId: string
+  targetType: 'DEPARTMENT' | 'DIMENSION_VALUE'
+  targetCode: string
+  targetName: string
+  toSubjectCode: string
+  toSubjectName: string
+  driverType: string
+  driverValue: number | null
+  ratio: number
+  allocatedAmount: number
+}
+
+export interface BffBudgetAllocationResultResponse {
+  planEventId: string
+  planEventName: string
+  planVersionId: string
+  planVersionName: string
+  executions: BffBudgetAllocationExecution[]
+}
+
+// AG Grid Tree Data 用のフラット化構造
+export interface BffBudgetAllocationTreeNode {
+  id: string
+  orgHierarchy: string[]  // ['イベント名', 'ステップ名', '配賦先']
+  nodeType: 'EVENT' | 'STEP' | 'DETAIL'
+  eventName?: string
+  stepName?: string
+  fromSubject?: string
+  fromDepartment?: string
+  targetName?: string
+  toSubject?: string
+  driverType?: string
+  ratio?: number
+  amount?: number
 }

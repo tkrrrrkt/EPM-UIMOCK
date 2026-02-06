@@ -196,4 +196,20 @@ export class DashboardService {
   async findTemplates(tenantId: string): Promise<ApiDashboardDto[]> {
     return this.dashboardRepository.findTemplates(tenantId);
   }
+
+  /**
+   * 科目（財務）選択肢取得
+   */
+  async getSubjectSelectors(tenantId: string, companyId: string) {
+    const subjects = await this.dashboardRepository.getActiveSubjects(tenantId, companyId);
+    return { items: subjects };
+  }
+
+  /**
+   * 指標（メトリクス）選択肢取得
+   */
+  async getMetricSelectors(tenantId: string, companyId: string) {
+    const metrics = await this.dashboardRepository.getActiveMetrics(tenantId, companyId);
+    return { items: metrics };
+  }
 }

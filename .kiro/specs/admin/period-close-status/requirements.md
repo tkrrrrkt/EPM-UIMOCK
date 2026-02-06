@@ -152,6 +152,64 @@
 
 ---
 
+### Requirement 8: 入力ロック状態の表示と管理
+
+**Objective:** As a 経理担当者, I want 月次期間の入力ロック状態を確認したい, so that 配賦処理済みかどうかを把握し適切な操作を判断できる
+
+#### Acceptance Criteria
+
+1. The Period Close Status Page shall 各月について input_locked 状態を視覚的に表示する（ロック中/解除）
+2. When 対象月が OPEN 状態かつ input_locked=true の場合, the Period Close Status Page shall 「ロック中」のバッジを表示する
+3. The Period Close Status Page shall input_locked の状態に基づいて利用可能な操作ボタンを制御する
+4. When 配賦処理が実行された場合, the Domain API shall 対象月の input_locked を true に設定する
+
+---
+
+### Requirement 9: 配賦イベント選択と実行
+
+**Objective:** As a 経理担当者, I want 実行する配賦イベントを選択したい, so that 必要な配賦処理のみを実行できる
+
+#### Acceptance Criteria
+
+1. When ユーザーが配賦処理ダイアログを開いた場合, the 配賦ダイアログ shall 当該会社の配賦イベント一覧を execution_order 順に表示する
+2. The 配賦イベント一覧 shall 各イベントのコード・名前・シナリオタイプ・ステップ数を表示する
+3. The 配賦ダイアログ shall チェックボックスで複数の配賦イベントを選択可能とする
+4. When ユーザーが配賦実行を選択した場合, the Domain API shall 選択されたイベントを execution_order 順に実行する
+5. When 配賦実行が完了した場合, the Domain API shall allocation_executions および allocation_execution_details にレコードを保存する
+6. When 同一期間に既存の配賦結果がある場合, the Domain API shall 既存結果を削除してから再計算する
+
+---
+
+### Requirement 10: 配賦結果VIEW画面
+
+**Objective:** As a 経理担当者, I want 配賦処理の結果を階層的に確認したい, so that 配賦内容が正しいか検証できる
+
+#### Acceptance Criteria
+
+1. When ユーザーが配賦結果ボタンをクリックした場合, the Period Close Status Page shall 配賦結果VIEW画面に遷移する
+2. The 配賦結果VIEW画面 shall 配賦イベント → ステップ → 明細 の階層構造で結果を表示する
+3. The 配賦結果VIEW画面 shall 各明細について配賦元科目・配賦元部門・配賦先・ドライバ種別・配賦比率・配賦金額を表示する
+4. The 配賦結果VIEW画面 shall Excel出力ボタンを提供し、階層構造を維持したExcelファイルをダウンロードできる
+5. The 配賦結果VIEW画面 shall CSV出力ボタンを提供し、フラットなCSVファイルをダウンロードできる
+6. When 対象期間に配賦結果がない場合, the 配賦結果VIEW画面 shall 「配賦結果がありません」と表示する
+
+---
+
+### Requirement 11: 入力ロック解除
+
+**Objective:** As a 権限を持つユーザー, I want 入力ロックを解除したい, so that 配賦後に修正が必要な場合に対処できる
+
+#### Acceptance Criteria
+
+1. When 対象月が OPEN 状態かつ input_locked=true の場合, the Period Close Status Page shall 入力ロック解除ボタンを表示する
+2. When ユーザーが入力ロック解除ボタンをクリックした場合, the Period Close Status Page shall 警告付きの確認ダイアログを表示する
+3. The 確認ダイアログ shall 「入力ロック解除により配賦結果が削除される」旨を明示する
+4. When ユーザーが入力ロック解除を確認した場合, the Domain API shall allocation_executions および allocation_execution_details から当該期間のレコードを削除する
+5. When 入力ロック解除が成功した場合, the Domain API shall fact_amounts から source_type='ALLOC' の当該期間レコードを削除する
+6. When 入力ロック解除が成功した場合, the Domain API shall 対象月の input_locked を false に設定する
+
+---
+
 ## Out of Scope（Phase 1 対象外）
 
 以下は本要件のスコープ外とし、将来 Phase で検討する：
@@ -162,3 +220,5 @@
 - 権限管理機能（Phase 1 では権限チェックなし）
 - 会社選択機能（Phase 1 では単一会社固定）
 - 配賦マスタの管理画面（別機能として実装）
+- 配賦シミュレーション機能（dryRunの高度化）
+- MEASURE ドライバの完全実装（物量マスタ連携）

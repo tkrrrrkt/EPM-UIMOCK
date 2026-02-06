@@ -1,14 +1,44 @@
-import type {
-  FormSectionDto,
-  FormFieldDto,
-} from '@epm/contracts/bff/meetings'
-
 /**
  * Meeting Minutes BFF Client Interface
  *
  * Handles meeting minutes form display and data submission.
  * Minutes form is loaded from Form Settings (sectionCode='MEETING_MINUTES' only).
  */
+
+/**
+ * Form field definition for meeting minutes
+ */
+export interface FormFieldDto {
+  id: string
+  sectionId: string
+  fieldCode: string
+  fieldName: string
+  fieldType: 'TEXT' | 'TEXTAREA' | 'DATE' | 'SELECT' | 'MULTI_SELECT' | 'FILE' | 'NUMBER'
+  isRequired: boolean
+  isActive: boolean
+  sortOrder: number
+  maxLength?: number
+  placeholder?: string
+  description?: string
+  validationRules?: Record<string, unknown>
+  options?: string[] // For SELECT/MULTI_SELECT
+}
+
+/**
+ * Form section definition
+ */
+export interface FormSectionDto {
+  id: string
+  meetingTypeId: string
+  sectionCode: string
+  sectionName: string
+  description?: string
+  inputScope: string
+  isRequired: boolean
+  isActive: boolean
+  sortOrder: number
+}
+
 export interface BffClient {
   /**
    * Get meeting minutes form definition

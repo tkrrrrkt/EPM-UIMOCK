@@ -58,7 +58,7 @@ export class DashboardBffService {
 
   constructor(private readonly httpService: HttpService) {
     // Domain API base URL (configurable via environment)
-    this.apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:3001';
+    this.apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:3002';
   }
 
   // =========================================================================
@@ -333,5 +333,43 @@ export class DashboardBffService {
     );
 
     return DashboardMapper.toKpiDefinitionOptionList(response.data);
+  }
+
+  /**
+   * Get subject (FACT) selector options
+   */
+  async getSubjectSelectors(
+    tenantId: string,
+    companyId: string,
+  ) {
+    const response = await firstValueFrom(
+      this.httpService.get(
+        `${this.apiBaseUrl}/api/reporting/dashboards/selectors/subjects`,
+        {
+          headers: this.createHeaders(tenantId, undefined, companyId),
+        },
+      ),
+    );
+
+    return DashboardMapper.toSubjectSelectorResponse(response.data);
+  }
+
+  /**
+   * Get metric selector options
+   */
+  async getMetricSelectors(
+    tenantId: string,
+    companyId: string,
+  ) {
+    const response = await firstValueFrom(
+      this.httpService.get(
+        `${this.apiBaseUrl}/api/reporting/dashboards/selectors/metrics`,
+        {
+          headers: this.createHeaders(tenantId, undefined, companyId),
+        },
+      ),
+    );
+
+    return DashboardMapper.toMetricSelectorResponse(response.data);
   }
 }

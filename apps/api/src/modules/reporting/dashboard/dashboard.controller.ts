@@ -40,6 +40,8 @@ import {
   ApiWidgetDataResponseDto,
   ApiDashboardSelectorsResponseDto,
   ApiKpiDefinitionOptionListDto,
+  ApiSubjectSelectorResponse,
+  ApiMetricSelectorResponse,
 } from '@epm/contracts/api/dashboard';
 import {
   DashboardNotFoundError,
@@ -251,6 +253,34 @@ export class DashboardController {
 
     // ウィジェットデータ取得
     return this.widgetDataService.getData(tenantId, companyId, widget, request.filter);
+  }
+
+  /**
+   * GET /api/reporting/dashboards/selectors/subjects
+   * 科目（FACT）選択肢取得
+   */
+  @Get('selectors/subjects')
+  async getSubjectSelectors(
+    @Headers('x-tenant-id') tenantId: string,
+    @Headers('x-company-id') companyId: string,
+  ) {
+    this.validateTenantId(tenantId);
+    this.validateCompanyId(companyId);
+    return this.dashboardService.getSubjectSelectors(tenantId, companyId);
+  }
+
+  /**
+   * GET /api/reporting/dashboards/selectors/metrics
+   * 指標（METRIC）選択肢取得
+   */
+  @Get('selectors/metrics')
+  async getMetricSelectors(
+    @Headers('x-tenant-id') tenantId: string,
+    @Headers('x-company-id') companyId: string,
+  ) {
+    this.validateTenantId(tenantId);
+    this.validateCompanyId(companyId);
+    return this.dashboardService.getMetricSelectors(tenantId, companyId);
   }
 
   // =========================================================================

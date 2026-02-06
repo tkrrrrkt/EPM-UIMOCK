@@ -15,6 +15,11 @@ import type {
   BffUpdateCellsResponse,
   BffBudgetCompareRequest,
   BffBudgetCompareResponse,
+  BffListBudgetAllocationEventsResponse,
+  BffExecuteBudgetAllocationRequest,
+  BffExecuteBudgetAllocationResponse,
+  BffBudgetAllocationStatus,
+  BffBudgetAllocationResultResponse,
 } from "@epm/contracts/bff/budget-entry"
 
 export interface BffClient {
@@ -32,4 +37,10 @@ export interface BffClient {
   updateCell(eventId: string, versionId: string, request: BffUpdateCellRequest): Promise<BffUpdateCellResponse>
   updateCells(eventId: string, versionId: string, request: BffUpdateCellsRequest): Promise<BffUpdateCellsResponse>
   getCompare(request: BffBudgetCompareRequest): Promise<BffBudgetCompareResponse>
+
+  // Allocation operations
+  listAllocationEvents(planEventId: string): Promise<BffListBudgetAllocationEventsResponse>
+  executeAllocation(request: BffExecuteBudgetAllocationRequest): Promise<BffExecuteBudgetAllocationResponse>
+  getAllocationStatus(planEventId: string): Promise<BffBudgetAllocationStatus>
+  getAllocationResult(planEventId: string, planVersionId?: string): Promise<BffBudgetAllocationResultResponse>
 }

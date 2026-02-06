@@ -311,7 +311,6 @@ export function DashboardEditPage({ dashboardId }: DashboardEditPageProps) {
           <Button
             onClick={handleSave}
             disabled={!hasChanges || saving}
-            className="bg-primary-600 hover:bg-primary-700"
           >
             {saving ? (
               <>

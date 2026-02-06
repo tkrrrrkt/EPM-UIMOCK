@@ -9,15 +9,6 @@
  * Reference:
  * - .kiro/specs/reporting/dashboard/requirements.md (Requirement 14.1-14.6)
  * - .kiro/specs/reporting/dashboard/tasks.md (Task 12.3)
- *
- * TODO for future enhancement:
- * - Implement proper tree picker for Subject (Fact) selection
- * - Implement list picker for KPI definition selection
- * - Implement list picker for Metric selection
- * - These require backend endpoints:
- *   - GET /api/bff/reporting/dashboards/selectors/subjects (with hierarchy)
- *   - GET /api/bff/reporting/dashboards/selectors/kpi-definitions
- *   - GET /api/bff/reporting/dashboards/selectors/metrics
  */
 'use client';
 
@@ -34,6 +25,8 @@ import {
 } from '@/shared/ui';
 import { X, Plus, Info } from 'lucide-react';
 import { bffClient } from '../api/client';
+import { SubjectSelector } from './SubjectSelector';
+import { MetricSelector } from './MetricSelector';
 import type { DataSource, DataSourceType, BffKpiDefinitionOption } from '@epm/contracts/bff/dashboard';
 
 interface DataSourceSelectorProps {
@@ -250,26 +243,31 @@ export function DataSourceSelector({
                       <p className="text-xs text-error-600">{kpiError}</p>
                     )}
                   </>
-                ) : (
-                  <>
-                    <Input
-                      id={`source-ref-${index}`}
-                      value={source.refId}
-                      onChange={(e) =>
-                        handleUpdate(index, { refId: e.target.value })
+                ) : source.type === 'FACT' ? (
+                  <SubjectSelector
+                    value={source.refId}
+                    onChange={(stableId, option) => {
+                      handleUpdate(index, { refId: stableId });
+                      if (!source.label) {
+                        handleUpdate(index, {
+                          label: `${option.subjectCode} ${option.subjectName}`,
+                        });
                       }
-                      placeholder={
-                        source.type === 'FACT'
-                          ? '例: 10001 (売上高)'
-                          : '例: metric-001'
+                    }}
+                  />
+                ) : source.type === 'METRIC' ? (
+                  <MetricSelector
+                    value={source.refId}
+                    onChange={(id, option) => {
+                      handleUpdate(index, { refId: id });
+                      if (!source.label) {
+                        handleUpdate(index, {
+                          label: `${option.metricCode} ${option.metricName}`,
+                        });
                       }
-                    />
-                    <p className="text-xs text-neutral-500">
-                      {source.type === 'FACT' && '勘定科目コードを入力'}
-                      {source.type === 'METRIC' && '指標マスタIDを入力'}
-                    </p>
-                  </>
-                )}
+                    }}
+                  />
+                ) : null}
               </div>
 
               {/* Label (for legend) */}

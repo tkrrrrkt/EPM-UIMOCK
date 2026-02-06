@@ -72,45 +72,45 @@ const mockDimensionValues: BffDimensionValueSummary[] = [
 // ツリー構造を持つ科目マスタ（レイアウトマスタに基づく階層表示）
 const mockSubjects: BffSubjectRow[] = [
   // 売上高（親）
-  { id: "subj-001", subjectCode: "1000", subjectName: "売上高", sortOrder: 1, isAggregate: true, parentRowId: null, indentLevel: 0 },
-  { id: "subj-001-1", subjectCode: "1010", subjectName: "製品売上高", sortOrder: 2, isAggregate: false, parentRowId: "subj-001", indentLevel: 1 },
-  { id: "subj-001-2", subjectCode: "1020", subjectName: "サービス売上高", sortOrder: 3, isAggregate: false, parentRowId: "subj-001", indentLevel: 1 },
-  { id: "subj-001-3", subjectCode: "1030", subjectName: "その他売上高", sortOrder: 4, isAggregate: false, parentRowId: "subj-001", indentLevel: 1 },
+  { id: "subj-001", subjectCode: "1000", subjectName: "売上高", sortOrder: 1, isAggregate: true, parentRowId: null, indentLevel: 0, treePath: ["売上高"] },
+  { id: "subj-001-1", subjectCode: "1010", subjectName: "製品売上高", sortOrder: 2, isAggregate: false, parentRowId: "subj-001", indentLevel: 1, treePath: ["売上高", "製品売上高"] },
+  { id: "subj-001-2", subjectCode: "1020", subjectName: "サービス売上高", sortOrder: 3, isAggregate: false, parentRowId: "subj-001", indentLevel: 1, treePath: ["売上高", "サービス売上高"] },
+  { id: "subj-001-3", subjectCode: "1030", subjectName: "その他売上高", sortOrder: 4, isAggregate: false, parentRowId: "subj-001", indentLevel: 1, treePath: ["売上高", "その他売上高"] },
 
   // 売上原価（親）
-  { id: "subj-002", subjectCode: "2000", subjectName: "売上原価", sortOrder: 5, isAggregate: true, parentRowId: null, indentLevel: 0 },
-  { id: "subj-002-1", subjectCode: "2010", subjectName: "材料費", sortOrder: 6, isAggregate: false, parentRowId: "subj-002", indentLevel: 1 },
-  { id: "subj-002-2", subjectCode: "2020", subjectName: "労務費", sortOrder: 7, isAggregate: false, parentRowId: "subj-002", indentLevel: 1 },
-  { id: "subj-002-3", subjectCode: "2030", subjectName: "外注費", sortOrder: 8, isAggregate: false, parentRowId: "subj-002", indentLevel: 1 },
-  { id: "subj-002-4", subjectCode: "2040", subjectName: "製造経費", sortOrder: 9, isAggregate: false, parentRowId: "subj-002", indentLevel: 1 },
+  { id: "subj-002", subjectCode: "2000", subjectName: "売上原価", sortOrder: 5, isAggregate: true, parentRowId: null, indentLevel: 0, treePath: ["売上原価"] },
+  { id: "subj-002-1", subjectCode: "2010", subjectName: "材料費", sortOrder: 6, isAggregate: false, parentRowId: "subj-002", indentLevel: 1, treePath: ["売上原価", "材料費"] },
+  { id: "subj-002-2", subjectCode: "2020", subjectName: "労務費", sortOrder: 7, isAggregate: false, parentRowId: "subj-002", indentLevel: 1, treePath: ["売上原価", "労務費"] },
+  { id: "subj-002-3", subjectCode: "2030", subjectName: "外注費", sortOrder: 8, isAggregate: false, parentRowId: "subj-002", indentLevel: 1, treePath: ["売上原価", "外注費"] },
+  { id: "subj-002-4", subjectCode: "2040", subjectName: "製造経費", sortOrder: 9, isAggregate: false, parentRowId: "subj-002", indentLevel: 1, treePath: ["売上原価", "製造経費"] },
 
   // 売上総利益（集計行）
-  { id: "subj-003", subjectCode: "3000", subjectName: "売上総利益", sortOrder: 10, isAggregate: true, parentRowId: null, indentLevel: 0 },
+  { id: "subj-003", subjectCode: "3000", subjectName: "売上総利益", sortOrder: 10, isAggregate: true, parentRowId: null, indentLevel: 0, treePath: ["売上総利益"] },
 
   // 販管費（親）
-  { id: "subj-004", subjectCode: "4000", subjectName: "販管費", sortOrder: 11, isAggregate: true, parentRowId: null, indentLevel: 0 },
-  { id: "subj-004-1", subjectCode: "4010", subjectName: "人件費", sortOrder: 12, isAggregate: false, parentRowId: "subj-004", indentLevel: 1 },
-  { id: "subj-004-2", subjectCode: "4020", subjectName: "広告宣伝費", sortOrder: 13, isAggregate: false, parentRowId: "subj-004", indentLevel: 1 },
-  { id: "subj-004-3", subjectCode: "4030", subjectName: "研究開発費", sortOrder: 14, isAggregate: false, parentRowId: "subj-004", indentLevel: 1 },
-  { id: "subj-004-4", subjectCode: "4040", subjectName: "その他経費", sortOrder: 15, isAggregate: false, parentRowId: "subj-004", indentLevel: 1 },
+  { id: "subj-004", subjectCode: "4000", subjectName: "販管費", sortOrder: 11, isAggregate: true, parentRowId: null, indentLevel: 0, treePath: ["販管費"] },
+  { id: "subj-004-1", subjectCode: "4010", subjectName: "人件費", sortOrder: 12, isAggregate: false, parentRowId: "subj-004", indentLevel: 1, treePath: ["販管費", "人件費"] },
+  { id: "subj-004-2", subjectCode: "4020", subjectName: "広告宣伝費", sortOrder: 13, isAggregate: false, parentRowId: "subj-004", indentLevel: 1, treePath: ["販管費", "広告宣伝費"] },
+  { id: "subj-004-3", subjectCode: "4030", subjectName: "研究開発費", sortOrder: 14, isAggregate: false, parentRowId: "subj-004", indentLevel: 1, treePath: ["販管費", "研究開発費"] },
+  { id: "subj-004-4", subjectCode: "4040", subjectName: "その他経費", sortOrder: 15, isAggregate: false, parentRowId: "subj-004", indentLevel: 1, treePath: ["販管費", "その他経費"] },
 
   // 営業利益（集計行）
-  { id: "subj-005", subjectCode: "5000", subjectName: "営業利益", sortOrder: 16, isAggregate: true, parentRowId: null, indentLevel: 0 },
+  { id: "subj-005", subjectCode: "5000", subjectName: "営業利益", sortOrder: 16, isAggregate: true, parentRowId: null, indentLevel: 0, treePath: ["営業利益"] },
 
   // 営業外収益（親）
-  { id: "subj-006", subjectCode: "6000", subjectName: "営業外収益", sortOrder: 17, isAggregate: true, parentRowId: null, indentLevel: 0 },
-  { id: "subj-006-1", subjectCode: "6010", subjectName: "受取利息", sortOrder: 18, isAggregate: false, parentRowId: "subj-006", indentLevel: 1 },
-  { id: "subj-006-2", subjectCode: "6020", subjectName: "受取配当金", sortOrder: 19, isAggregate: false, parentRowId: "subj-006", indentLevel: 1 },
+  { id: "subj-006", subjectCode: "6000", subjectName: "営業外収益", sortOrder: 17, isAggregate: true, parentRowId: null, indentLevel: 0, treePath: ["営業外収益"] },
+  { id: "subj-006-1", subjectCode: "6010", subjectName: "受取利息", sortOrder: 18, isAggregate: false, parentRowId: "subj-006", indentLevel: 1, treePath: ["営業外収益", "受取利息"] },
+  { id: "subj-006-2", subjectCode: "6020", subjectName: "受取配当金", sortOrder: 19, isAggregate: false, parentRowId: "subj-006", indentLevel: 1, treePath: ["営業外収益", "受取配当金"] },
 
   // 営業外費用（親）
-  { id: "subj-007", subjectCode: "7000", subjectName: "営業外費用", sortOrder: 20, isAggregate: true, parentRowId: null, indentLevel: 0 },
-  { id: "subj-007-1", subjectCode: "7010", subjectName: "支払利息", sortOrder: 21, isAggregate: false, parentRowId: "subj-007", indentLevel: 1 },
+  { id: "subj-007", subjectCode: "7000", subjectName: "営業外費用", sortOrder: 20, isAggregate: true, parentRowId: null, indentLevel: 0, treePath: ["営業外費用"] },
+  { id: "subj-007-1", subjectCode: "7010", subjectName: "支払利息", sortOrder: 21, isAggregate: false, parentRowId: "subj-007", indentLevel: 1, treePath: ["営業外費用", "支払利息"] },
 
   // 経常利益（集計行）
-  { id: "subj-008", subjectCode: "8000", subjectName: "経常利益", sortOrder: 22, isAggregate: true, parentRowId: null, indentLevel: 0 },
+  { id: "subj-008", subjectCode: "8000", subjectName: "経常利益", sortOrder: 22, isAggregate: true, parentRowId: null, indentLevel: 0, treePath: ["経常利益"] },
 
   // 当期純利益（集計行）
-  { id: "subj-009", subjectCode: "9000", subjectName: "当期純利益", sortOrder: 23, isAggregate: true, parentRowId: null, indentLevel: 0 },
+  { id: "subj-009", subjectCode: "9000", subjectName: "当期純利益", sortOrder: 23, isAggregate: true, parentRowId: null, indentLevel: 0, treePath: ["当期純利益"] },
 ]
 
 export class MockBffClient implements BffClient {

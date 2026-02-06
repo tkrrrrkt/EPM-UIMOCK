@@ -19,6 +19,8 @@ import type {
   BffDashboardSelectorsRequestDto,
   BffDashboardSelectorsResponseDto,
   BffKpiDefinitionOptionListDto,
+  BffSubjectSelectorResponse,
+  BffMetricSelectorResponse,
 } from '@epm/contracts/bff/dashboard';
 
 /** Query parameters for dashboard list */
@@ -90,4 +92,14 @@ export interface BffClient {
    * Get dashboard templates
    */
   getTemplates(): Promise<BffDashboardTemplateListDto>;
+
+  /**
+   * Get subject (FACT) selectors
+   */
+  getSubjectSelectors(): Promise<BffSubjectSelectorResponse>;
+
+  /**
+   * Get metric selectors
+   */
+  getMetricSelectors(): Promise<BffMetricSelectorResponse>;
 }

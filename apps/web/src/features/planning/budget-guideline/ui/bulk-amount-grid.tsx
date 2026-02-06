@@ -1,18 +1,18 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
+import type { ColDef } from "ag-grid-community"
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-  Input,
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/shared/ui"
+import { EditableAmountGrid, type GuidelineAmountRowData, type PendingChange, amountValueFormatter, amountValueParser } from "@/shared/ag-grid"
 import type {
   BffSubjectRow,
   BffPeriodColumn,
@@ -20,7 +20,6 @@ import type {
   BffActualCell,
   BffDimensionValueSummary,
 } from "@epm/contracts/bff/budget-guideline"
-import { cn } from "@/lib/utils"
 
 interface BulkAmountData {
   dimensionValueId: string
@@ -38,15 +37,17 @@ interface BulkAmountGridProps {
   onAmountChange: (dimensionValueId: string, subjectId: string, periodKey: string, amount: string) => void
 }
 
+/**
+ * 予算ガイドライン 一括入力グリッド（AG-Grid版）
+ *
+ * 機能:
+ * - 全社合計: 読み取り専用、フロント側でリアルタイム自動集計
+ * - 各事業部: アコーディオン内にAG-Gridインスタンス配置
+ * - Excelライクなコピー＆ペースト
+ * - 範囲選択
+ */
 export function BulkAmountGrid({ dimensionValues, bulkData, onAmountChange }: BulkAmountGridProps) {
-  const [editingCell, setEditingCell] = useState<{
-    dimensionValueId: string
-    subjectId: string
-    periodKey: string
-  } | null>(null)
-  const [editValue, setEditValue] = useState("")
   const [localAmounts, setLocalAmounts] = useState<Map<string, string>>(new Map())
-  const inputRef = useRef<HTMLInputElement>(null)
 
   // 初期データをローカルステートに設定
   useEffect(() => {
@@ -60,41 +61,31 @@ export function BulkAmountGrid({ dimensionValues, bulkData, onAmountChange }: Bu
     setLocalAmounts(amountMap)
   }, [bulkData])
 
-  useEffect(() => {
-    if (editingCell && inputRef.current) {
-      inputRef.current.focus()
-      inputRef.current.select()
-    }
-  }, [editingCell])
-
   // 全社分を最初に取得（サンプルとして科目・期間情報を得る）
   const totalData = bulkData.find((d) => d.dimensionValueId === "dv-total")
   const sampleData = totalData || bulkData[0]
+
   if (!sampleData) return null
 
   const subjects = sampleData.subjects
   const guidelinePeriods = sampleData.guidelinePeriods
   const actualsYears = sampleData.actualsYears
 
-  const formatAmount = (amount: string): string => {
-    if (!amount || amount === "0") return "-"
-    const num = Number(amount)
-    return num.toLocaleString("ja-JP")
-  }
+  // ガイドライン列のフィールド名リスト
+  const glFields = useMemo(() => {
+    return guidelinePeriods.map((p) => `gl_${p.key}`)
+  }, [guidelinePeriods])
 
-  const getActualAmount = (data: BulkAmountData, subjectId: string, fiscalYear: number): string => {
-    const cell = data.actualsAmounts.find((a) => a.subjectId === subjectId && a.fiscalYear === fiscalYear)
-    return cell ? formatAmount(cell.amount) : "-"
-  }
-
-  const getGuidelineAmount = (dimensionValueId: string, subjectId: string, periodKey: string): string => {
-    const key = `${dimensionValueId}-${subjectId}-${periodKey}`
-    return localAmounts.get(key) || ""
-  }
+  // ディメンション値を並び替え（全社が最初、それ以外はソート順）
+  const sortedDimensionValues = useMemo(() => {
+    const totalDv = dimensionValues.find((dv) => dv.isTotal)
+    const otherDvs = dimensionValues.filter((dv) => !dv.isTotal)
+    return totalDv ? [totalDv, ...otherDvs] : otherDvs
+  }, [dimensionValues])
 
   // フロントエンド側での全社集計計算
   const calculateTotalAmount = useCallback(
-    (subjectId: string, periodKey: string): string => {
+    (subjectId: string, periodKey: string): number => {
       let total = 0
       bulkData
         .filter((d) => d.dimensionValueId !== "dv-total")
@@ -105,139 +96,163 @@ export function BulkAmountGrid({ dimensionValues, bulkData, onAmountChange }: Bu
             total += Number(amount) || 0
           }
         })
-      return String(total)
+      return total
     },
-    [bulkData, localAmounts],
+    [bulkData, localAmounts]
   )
 
-  const handleCellClick = (dimensionValueId: string, subjectId: string, periodKey: string, isAggregate: boolean) => {
-    const data = bulkData.find((d) => d.dimensionValueId === dimensionValueId)
-    if (!data || data.isReadOnly || isAggregate) return
-    // 全社合計は編集不可
-    if (dimensionValueId === "dv-total") return
+  // ツリーパス取得コールバック
+  const getDataPath = useCallback((row: GuidelineAmountRowData) => {
+    return row.treePath || [row.subjectName]
+  }, [])
 
-    const currentAmount = getGuidelineAmount(dimensionValueId, subjectId, periodKey)
-    setEditingCell({ dimensionValueId, subjectId, periodKey })
-    setEditValue(currentAmount)
-  }
+  // 列定義生成（科目名列はautoGroupColumnDefで自動生成）
+  const createColumnDefs = useCallback(
+    (isTotal: boolean, isReadOnly: boolean): ColDef<GuidelineAmountRowData>[] => {
+      const cols: ColDef<GuidelineAmountRowData>[] = []
 
-  const handleSave = () => {
-    if (editingCell) {
-      // ローカルステートを更新
-      const key = `${editingCell.dimensionValueId}-${editingCell.subjectId}-${editingCell.periodKey}`
+      // 実績年度列を追加
+      actualsYears.forEach((year) => {
+        cols.push({
+          field: `actual_${year}`,
+          headerName: `FY${year}\n実績`,
+          width: 100,
+          editable: false,
+          valueFormatter: amountValueFormatter,
+          cellStyle: {
+            textAlign: "right",
+            backgroundColor: "hsl(var(--muted) / 0.3)",
+            color: "hsl(var(--muted-foreground))",
+          },
+          cellClass: "tabular-nums",
+        })
+      })
+
+      // ガイドライン期間列を追加
+      guidelinePeriods.forEach((period) => {
+        const canEdit = !isTotal && !isReadOnly
+
+        cols.push({
+          field: `gl_${period.key}`,
+          headerName: `${period.label}\nGL`,
+          width: 120,
+          editable: (params) => {
+            if (!canEdit) return false
+            if (params.data?.isAggregate) return false
+            return true
+          },
+          valueFormatter: amountValueFormatter,
+          valueParser: amountValueParser,
+          cellStyle: (params) => {
+            const style: Record<string, string> = { textAlign: "right" }
+            if (isTotal) {
+              style.backgroundColor = "hsl(var(--primary) / 0.05)"
+              style.fontWeight = "600"
+            }
+            return style
+          },
+          cellClass: (params) => {
+            const classes: string[] = ["tabular-nums"]
+            if (params.data?.isAggregate) classes.push("font-semibold")
+            return classes.join(" ")
+          },
+        })
+      })
+
+      return cols
+    },
+    [actualsYears, guidelinePeriods]
+  )
+
+  // 全社合計用の行データ生成
+  const totalRowData = useMemo<GuidelineAmountRowData[]>(() => {
+    return subjects.map((subject) => {
+      const row: GuidelineAmountRowData = {
+        id: subject.id,
+        subjectCode: subject.subjectCode,
+        subjectName: subject.subjectName,
+        isAggregate: subject.isAggregate,
+        indentLevel: subject.indentLevel,
+        treePath: subject.treePath,
+      }
+
+      // 実績年度
+      actualsYears.forEach((year) => {
+        const fieldName = `actual_${year}`
+        const key = `dv-total-${subject.id}-${year}`
+        // 実績は各データから取得
+        const amount = totalData?.actualsAmounts.find(
+          (a) => a.subjectId === subject.id && a.fiscalYear === year
+        )
+        row[fieldName] = parseFloat(amount?.amount || "0")
+      })
+
+      // ガイドライン期間（フロント側で集計）
+      guidelinePeriods.forEach((period) => {
+        const fieldName = `gl_${period.key}`
+        row[fieldName] = calculateTotalAmount(subject.id, period.key)
+      })
+
+      return row
+    })
+  }, [subjects, actualsYears, guidelinePeriods, totalData, calculateTotalAmount])
+
+  // 事業部用の行データ生成
+  const createBuRowData = useCallback(
+    (data: BulkAmountData): GuidelineAmountRowData[] => {
+      return subjects.map((subject) => {
+        const row: GuidelineAmountRowData = {
+          id: subject.id,
+          subjectCode: subject.subjectCode,
+          subjectName: subject.subjectName,
+          isAggregate: subject.isAggregate,
+          indentLevel: subject.indentLevel,
+          treePath: subject.treePath,
+        }
+
+        // 実績年度
+        actualsYears.forEach((year) => {
+          const fieldName = `actual_${year}`
+          const amount = data.actualsAmounts.find(
+            (a) => a.subjectId === subject.id && a.fiscalYear === year
+          )
+          row[fieldName] = parseFloat(amount?.amount || "0")
+        })
+
+        // ガイドライン期間
+        guidelinePeriods.forEach((period) => {
+          const fieldName = `gl_${period.key}`
+          const key = `${data.dimensionValueId}-${subject.id}-${period.key}`
+          row[fieldName] = parseFloat(localAmounts.get(key) || "0")
+        })
+
+        return row
+      })
+    },
+    [subjects, actualsYears, guidelinePeriods, localAmounts]
+  )
+
+  // セル値変更時の処理
+  const handleCellValueChanged = useCallback(
+    (dimensionValueId: string) => (change: PendingChange) => {
+      const periodKey = change.field.replace(/^gl_/, "")
+      const key = `${dimensionValueId}-${change.rowId}-${periodKey}`
+
+      // ローカル状態を更新
       setLocalAmounts((prev) => {
-        const next = new Map(prev)
-        next.set(key, editValue)
-        return next
+        const updated = new Map(prev)
+        updated.set(key, change.newValue)
+        return updated
       })
 
       // 親に通知
-      onAmountChange(editingCell.dimensionValueId, editingCell.subjectId, editingCell.periodKey, editValue)
-      setEditingCell(null)
-    }
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSave()
-    } else if (e.key === "Escape") {
-      setEditingCell(null)
-    }
-  }
-
-  // ディメンション値を並び替え（全社が最初、それ以外はソート順）
-  const sortedDimensionValues = useMemo(() => {
-    const totalDv = dimensionValues.find((dv) => dv.isTotal)
-    const otherDvs = dimensionValues.filter((dv) => !dv.isTotal)
-    return totalDv ? [totalDv, ...otherDvs] : otherDvs
-  }, [dimensionValues])
-
-  // 共通テーブルヘッダー
-  const renderTableHeader = () => (
-    <tr className="border-b bg-muted/50">
-      <th className="sticky left-0 z-20 min-w-[180px] border-r bg-muted/50 p-3 text-left font-medium">科目</th>
-      {actualsYears.map((year) => (
-        <th key={year} className="min-w-[100px] border-r bg-muted/50 p-3 text-right font-medium">
-          FY{year}
-          <div className="text-xs font-normal text-muted-foreground">(実績)</div>
-        </th>
-      ))}
-      {guidelinePeriods.map((period) => (
-        <th key={period.key} className="min-w-[120px] border-r bg-background p-3 text-right font-medium">
-          {period.label}
-          <div className="text-xs font-normal text-muted-foreground">(GL)</div>
-        </th>
-      ))}
-    </tr>
+      onAmountChange(dimensionValueId, change.rowId, periodKey, change.newValue)
+    },
+    [onAmountChange]
   )
 
-  // テーブル行レンダリング
-  const renderTableRow = (data: BulkAmountData, subject: BffSubjectRow, isTotal: boolean) => {
-    const canEdit = !data.isReadOnly && !subject.isAggregate && !isTotal
-
-    return (
-      <tr
-        key={`${data.dimensionValueId}-${subject.id}`}
-        className={cn("border-b hover:bg-muted/30", subject.isAggregate && "bg-muted/20")}
-      >
-        <td
-          className={cn(
-            "sticky left-0 z-10 border-r bg-background p-3 font-medium",
-            subject.isAggregate && "bg-muted/20 font-semibold",
-          )}
-        >
-          {subject.subjectName}
-        </td>
-
-        {/* 実績列 */}
-        {actualsYears.map((year) => (
-          <td key={year} className="border-r bg-muted/10 p-3 text-right tabular-nums text-muted-foreground">
-            {getActualAmount(data, subject.id, year)}
-          </td>
-        ))}
-
-        {/* ガイドライン列 */}
-        {guidelinePeriods.map((period) => {
-          const isEditing =
-            editingCell?.dimensionValueId === data.dimensionValueId &&
-            editingCell?.subjectId === subject.id &&
-            editingCell?.periodKey === period.key
-
-          // 全社の場合はフロント側で集計
-          const amount = isTotal
-            ? calculateTotalAmount(subject.id, period.key)
-            : getGuidelineAmount(data.dimensionValueId, subject.id, period.key)
-
-          return (
-            <td
-              key={period.key}
-              className={cn(
-                "border-r p-3 text-right tabular-nums",
-                canEdit && "cursor-pointer hover:bg-primary/5",
-                subject.isAggregate && "bg-muted/20 font-semibold",
-                isTotal && "bg-primary/5 font-semibold",
-              )}
-              onClick={() => handleCellClick(data.dimensionValueId, subject.id, period.key, subject.isAggregate)}
-            >
-              {isEditing ? (
-                <Input
-                  ref={inputRef}
-                  type="text"
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onBlur={handleSave}
-                  onKeyDown={handleKeyDown}
-                  className="h-8 w-full text-right"
-                />
-              ) : (
-                formatAmount(amount)
-              )}
-            </td>
-          )
-        })}
-      </tr>
-    )
-  }
+  // 列定義（全社用・読み取り専用）
+  const totalColumnDefs = useMemo(() => createColumnDefs(true, true), [createColumnDefs])
 
   return (
     <div className="space-y-4">
@@ -251,14 +266,16 @@ export function BulkAmountGrid({ dimensionValues, bulkData, onAmountChange }: Bu
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-sm">
-                <thead>{renderTableHeader()}</thead>
-                <tbody>
-                  {subjects.map((subject) => renderTableRow(totalData, subject, true))}
-                </tbody>
-              </table>
-            </div>
+            <EditableAmountGrid<GuidelineAmountRowData>
+              rowData={totalRowData}
+              columnDefs={totalColumnDefs}
+              isReadOnly={true}
+              height={Math.min(300, 80 + subjects.length * 36)}
+              getRowId={(data) => data.id}
+              treeData={true}
+              getDataPath={getDataPath}
+              groupDefaultExpanded={1}
+            />
           </CardContent>
         </Card>
       )}
@@ -271,6 +288,9 @@ export function BulkAmountGrid({ dimensionValues, bulkData, onAmountChange }: Bu
             const data = bulkData.find((d) => d.dimensionValueId === dv.id)
             if (!data) return null
 
+            const buColumnDefs = createColumnDefs(false, data.isReadOnly)
+            const buRowData = createBuRowData(data)
+
             return (
               <AccordionItem key={dv.id} value={dv.id}>
                 <AccordionTrigger className="px-4 py-3 hover:no-underline">
@@ -282,13 +302,18 @@ export function BulkAmountGrid({ dimensionValues, bulkData, onAmountChange }: Bu
                   </div>
                 </AccordionTrigger>
                 <AccordionContent>
-                  <div className="overflow-x-auto border-t">
-                    <table className="w-full border-collapse text-sm">
-                      <thead>{renderTableHeader()}</thead>
-                      <tbody>
-                        {subjects.map((subject) => renderTableRow(data, subject, false))}
-                      </tbody>
-                    </table>
+                  <div className="border-t">
+                    <EditableAmountGrid<GuidelineAmountRowData>
+                      rowData={buRowData}
+                      columnDefs={buColumnDefs}
+                      isReadOnly={data.isReadOnly}
+                      height={Math.min(300, 80 + subjects.length * 36)}
+                      onCellValueChanged={handleCellValueChanged(dv.id)}
+                      getRowId={(data) => data.id}
+                      treeData={true}
+                      getDataPath={getDataPath}
+                      groupDefaultExpanded={1}
+                    />
                   </div>
                 </AccordionContent>
               </AccordionItem>

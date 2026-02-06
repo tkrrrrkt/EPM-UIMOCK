@@ -142,7 +142,7 @@ export function MinutesFormTab({
         // Convert form values to DTO format
         const fieldValues = Object.entries(values).map(([fieldId, value]) => ({
           formFieldId: fieldId,
-          value: value || null,
+          value: (value || null) as string | number | boolean | Date | File[] | null,
         }))
 
         await client.saveMinutes(eventId, { fieldValues })

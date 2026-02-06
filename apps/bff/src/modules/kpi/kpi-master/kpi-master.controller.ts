@@ -96,7 +96,7 @@ interface GetKpiDefinitionsQueryDto {
   keyword?: string;
 }
 
-@Controller('bff/kpi-master')
+@Controller('kpi-master')
 export class KpiMasterBffController {
   constructor(private readonly service: KpiMasterBffService) {}
 

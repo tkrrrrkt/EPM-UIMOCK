@@ -87,7 +87,7 @@ export class KpiMasterBffService {
 
   constructor(private readonly httpService: HttpService) {
     // Domain API base URL (configurable via environment)
-    this.apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:3001';
+    this.apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:3002';
   }
 
   // =========================================================================

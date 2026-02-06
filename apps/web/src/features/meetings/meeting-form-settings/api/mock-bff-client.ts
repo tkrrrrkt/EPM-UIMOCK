@@ -17,6 +17,7 @@ import type {
 // ============================================
 
 const mockSections: FormSectionDto[] = [
+  // mt-1: 月次経営会議
   {
     id: 'sec-1',
     meetingTypeId: 'mt-1',
@@ -75,6 +76,92 @@ const mockSections: FormSectionDto[] = [
     sortOrder: 50,
     description: null,
     isActive: false,
+    fieldCount: 1,
+  },
+  // mt-2: 四半期経営会議
+  {
+    id: 'sec-6',
+    meetingTypeId: 'mt-2',
+    sectionCode: 'SUMMARY',
+    sectionName: 'サマリー',
+    inputScope: 'DEPARTMENT',
+    isRequired: true,
+    sortOrder: 10,
+    description: '四半期のサマリーと戦略分析',
+    isActive: true,
+    fieldCount: 2,
+  },
+  {
+    id: 'sec-7',
+    meetingTypeId: 'mt-2',
+    sectionCode: 'VARIANCE_ANALYSIS',
+    sectionName: '差異分析',
+    inputScope: 'DEPARTMENT',
+    isRequired: true,
+    sortOrder: 20,
+    description: '四半期の予算差異詳細',
+    isActive: true,
+    fieldCount: 1,
+  },
+  {
+    id: 'sec-8',
+    meetingTypeId: 'mt-2',
+    sectionCode: 'STRATEGIC_ISSUES',
+    sectionName: '戦略課題',
+    inputScope: 'DEPARTMENT',
+    isRequired: false,
+    sortOrder: 30,
+    description: null,
+    isActive: true,
+    fieldCount: 1,
+  },
+  {
+    id: 'sec-9',
+    meetingTypeId: 'mt-2',
+    sectionCode: 'STRATEGIC_ACTION',
+    sectionName: 'アクション',
+    inputScope: 'DEPARTMENT',
+    isRequired: true,
+    sortOrder: 40,
+    description: null,
+    isActive: true,
+    fieldCount: 1,
+  },
+  // mt-3: 取締役会
+  {
+    id: 'sec-10',
+    meetingTypeId: 'mt-3',
+    sectionCode: 'BOARD_SUMMARY',
+    sectionName: 'サマリー',
+    inputScope: 'DEPARTMENT',
+    isRequired: true,
+    sortOrder: 10,
+    description: 'エグゼクティブサマリー',
+    isActive: true,
+    fieldCount: 1,
+  },
+  {
+    id: 'sec-11',
+    meetingTypeId: 'mt-3',
+    sectionCode: 'DECISIONS',
+    sectionName: '決定事項',
+    inputScope: 'DEPARTMENT',
+    isRequired: true,
+    sortOrder: 20,
+    description: '取締役会での主要決定',
+    isActive: true,
+    fieldCount: 1,
+  },
+  {
+    id: 'sec-12',
+    meetingTypeId: 'mt-3',
+    sectionCode: 'GOVERNANCE_RISKS',
+    sectionName: 'リスク',
+    inputScope: 'DEPARTMENT',
+    isRequired: false,
+    sortOrder: 30,
+    description: null,
+    isActive: true,
     fieldCount: 1,
   },
 ]
@@ -283,6 +370,162 @@ const mockFieldsForSec5: FormFieldDto[] = [
   },
 ]
 
+// mt-2: 四半期経営会議 - Section 6 (SUMMARY)
+const mockFieldsForSec6: FormFieldDto[] = [
+  {
+    id: 'fld-6-1',
+    sectionId: 'sec-6',
+    fieldCode: 'QUARTERLY_SUMMARY',
+    fieldName: '四半期サマリー',
+    fieldType: 'TEXTAREA',
+    isRequired: true,
+    placeholder: '四半期の業績概要を入力してください',
+    options: null,
+    validation: null,
+    defaultValue: null,
+    maxLength: 3000,
+    helpText: '当四半期の主要な業績と達成状況をまとめてください',
+    sortOrder: 10,
+    isActive: true,
+  },
+  {
+    id: 'fld-6-2',
+    sectionId: 'sec-6',
+    fieldCode: 'STRATEGIC_ANALYSIS',
+    fieldName: '戦略分析',
+    fieldType: 'TEXTAREA',
+    isRequired: true,
+    placeholder: '戦略的な分析内容を入力してください',
+    options: null,
+    validation: null,
+    defaultValue: null,
+    maxLength: 3000,
+    helpText: '市場環境や競争状況との関連付けで分析してください',
+    sortOrder: 20,
+    isActive: true,
+  },
+]
+
+// mt-2: 四半期経営会議 - Section 7 (VARIANCE_ANALYSIS)
+const mockFieldsForSec7: FormFieldDto[] = [
+  {
+    id: 'fld-7-1',
+    sectionId: 'sec-7',
+    fieldCode: 'BUDGET_VARIANCE_DETAIL',
+    fieldName: '予算差異詳細',
+    fieldType: 'TEXTAREA',
+    isRequired: true,
+    placeholder: '四半期の予算差異を詳しく説明してください',
+    options: null,
+    validation: null,
+    defaultValue: null,
+    maxLength: 3000,
+    helpText: '月次の差異分析結果をまとめ、主要要因を記載してください',
+    sortOrder: 10,
+    isActive: true,
+  },
+]
+
+// mt-2: 四半期経営会議 - Section 8 (STRATEGIC_ISSUES)
+const mockFieldsForSec8: FormFieldDto[] = [
+  {
+    id: 'fld-8-1',
+    sectionId: 'sec-8',
+    fieldCode: 'STRATEGIC_RISKS',
+    fieldName: '戦略的リスク',
+    fieldType: 'TEXTAREA',
+    isRequired: false,
+    placeholder: '四半期の戦略的なリスク要因を入力してください',
+    options: null,
+    validation: null,
+    defaultValue: null,
+    maxLength: 2000,
+    helpText: '次四半期以降に影響を与える可能性のあるリスクを記載',
+    sortOrder: 10,
+    isActive: true,
+  },
+]
+
+// mt-2: 四半期経営会議 - Section 9 (STRATEGIC_ACTION)
+const mockFieldsForSec9: FormFieldDto[] = [
+  {
+    id: 'fld-9-1',
+    sectionId: 'sec-9',
+    fieldCode: 'STRATEGIC_ACTIONS',
+    fieldName: '戦略アクション',
+    fieldType: 'TEXTAREA',
+    isRequired: true,
+    placeholder: 'アクション項目を記載してください',
+    options: null,
+    validation: null,
+    defaultValue: null,
+    maxLength: 2000,
+    helpText: '次四半期に向けた対策内容を記載してください',
+    sortOrder: 10,
+    isActive: true,
+  },
+]
+
+// mt-3: 取締役会 - Section 10 (BOARD_SUMMARY)
+const mockFieldsForSec10: FormFieldDto[] = [
+  {
+    id: 'fld-10-1',
+    sectionId: 'sec-10',
+    fieldCode: 'BOARD_SUMMARY',
+    fieldName: 'エグゼクティブサマリー',
+    fieldType: 'TEXTAREA',
+    isRequired: true,
+    placeholder: 'C-levelビューの業績サマリーを入力してください',
+    options: null,
+    validation: null,
+    defaultValue: null,
+    maxLength: 2000,
+    helpText: '取締役向けの簡潔でインパクトのあるサマリーを作成してください',
+    sortOrder: 10,
+    isActive: true,
+  },
+]
+
+// mt-3: 取締役会 - Section 11 (DECISIONS)
+const mockFieldsForSec11: FormFieldDto[] = [
+  {
+    id: 'fld-11-1',
+    sectionId: 'sec-11',
+    fieldCode: 'KEY_DECISIONS',
+    fieldName: '主要決定事項',
+    fieldType: 'TEXTAREA',
+    isRequired: true,
+    placeholder: '取締役会での主要な決定事項を入力してください',
+    options: null,
+    validation: null,
+    defaultValue: null,
+    maxLength: 2000,
+    helpText: 'ガバナンス、資本配分、戦略についての決定を記載',
+    sortOrder: 10,
+    isActive: true,
+  },
+]
+
+// mt-3: 取締役会 - Section 12 (GOVERNANCE_RISKS)
+const mockFieldsForSec12: FormFieldDto[] = [
+  {
+    id: 'fld-12-1',
+    sectionId: 'sec-12',
+    fieldCode: 'BOARD_RISKS',
+    fieldName: 'ガバナンスリスク',
+    fieldType: 'TEXTAREA',
+    isRequired: false,
+    placeholder: 'ガバナンスに関連するリスク要因を入力してください',
+    options: null,
+    validation: null,
+    defaultValue: null,
+    maxLength: 2000,
+    helpText: 'コンプライアンス、内部統制等の観点からのリスク',
+    sortOrder: 10,
+    isActive: true,
+  },
+]
+
 // ============================================
 // MockBffClient Implementation
 // ============================================
@@ -295,6 +538,13 @@ export class MockBffClient implements BffClient {
     ['sec-3', [...mockFieldsForSec3]],
     ['sec-4', [...mockFieldsForSec4]],
     ['sec-5', [...mockFieldsForSec5]],
+    ['sec-6', [...mockFieldsForSec6]],
+    ['sec-7', [...mockFieldsForSec7]],
+    ['sec-8', [...mockFieldsForSec8]],
+    ['sec-9', [...mockFieldsForSec9]],
+    ['sec-10', [...mockFieldsForSec10]],
+    ['sec-11', [...mockFieldsForSec11]],
+    ['sec-12', [...mockFieldsForSec12]],
   ])
 
   private delay(ms: number = 300): Promise<void> {

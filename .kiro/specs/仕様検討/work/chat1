@@ -1,0 +1,1182 @@
+プロジェクト理解サマリ
+1. プロダクト概要（product.md）
+Enterprise Performance Management (EPM) SaaS - 中堅企業（年商100〜1000億円）向けの戦略的経営管理プラットフォーム
+
+コアバリュー:
+
+Single Source of Truth - 予算・実績・見込・KPIを正本として一元管理
+Explainable EPM - 差異×コメント×履歴×仮説を構造的に保持
+AI-Augmented FP&A - 人の判断を置き換えず、思考を拡張するAI活用
+Governed but Practical - 締め・権限・監査を担保しつつ実務に即した運用
+AI活用方針: AIは意思決定の主体ではなく補助。フェーズ1は「AIレディな基盤」、フェーズ2以降で分析補助・仮説支援を段階展開
+
+2. 開発方法論 CCSDD（development-process.md）
+Contract-Centered Specification Driven Development - 仕様駆動・契約中心の開発
+
+Golden Rules:
+
+SSoTは .kiro/ と packages/contracts/
+Contracts-first順序: contracts → DB → Domain API → BFF → UI
+Spec（仕様）が正、コードは従属
+境界厳守: UI → BFF → API → DB
+開発ステップ:
+
+
+Requirements → Design → Design Review (GO/NO-GO) → Tasks 
+→ Contracts実装 → Scaffold → v0 UI生成（隔離）→ 受入チェック 
+→ 移植 → Backend実装 → 統合テスト
+3. 技術スタック（tech.md）
+レイヤー	技術
+Frontend	Next.js (App Router), React, TypeScript, Tailwind CSS
+BFF	NestJS（UI最適化API、集約・変換のみ）
+Domain API	NestJS（モジュラーモノリス）
+DB	PostgreSQL + Prisma ORM
+認証	Clerk
+非交渉ルール:
+
+マルチテナント必須（全テーブルにtenant_id、RLS有効）
+経営数値はDECIMAL型（JavaScript numberで計算禁止）
+監査ログ必須（誰が、いつ、何を、どう変えたか）
+4. アーキテクチャ構造（structure.md）
+
+.kiro/
+├── steering/       # プロジェクト憲法（tech.md, product.md, structure.md等）
+└── specs/          # Feature単位の仕様（requirements.md, design.md, tasks.md）
+    ├── 仕様概要/   # 確定仕様のサマリ
+    ├── 仕様検討/   # QA議論の経過記録
+    └── entities/   # エンティティ定義（DBのSSoT）
+
+packages/
+├── contracts/      # API/BFF/UI共通の契約SSoT
+│   ├── src/api/    # Domain API契約（UIからの参照禁止）
+│   └── src/bff/    # BFF契約（UIが参照する唯一の契約）
+└── db/             # Prismaスキーマ・マイグレーション
+
+apps/
+├── api/            # Domain API（ビジネスロジック）
+├── bff/            # BFF（画面向けI/O整形）
+└── web/            # Frontend
+    ├── _v0_drop/   # v0生成物の隔離ゾーン
+    └── src/
+        ├── features/   # Feature単位の実装
+        └── shared/     # Design System, Shell, Navigation（横串SSoT）
+5. 主要ドメイン概念（エンティティ定義より）
+マスタ系:
+
+tenants / companies（テナント・会社）
+organization_versions / departments（組織版・部門）
+subjects（科目：財務FIN + KPI）
+dimensions / dimension_values（分析軸・グループ）
+accounting_periods（会計期間・締め状態）
+トランザクション系:
+
+plan_events / plan_versions（計画イベント・バージョン）
+fact_amounts（予算・見込・実績ファクト）
+fact_dimension_links（ディメンション付与）
+シナリオ種別:
+
+MTP（中期経営計画）→ GUIDELINE（予算ガイドライン）→ BUDGET（予算）→ FORECAST（見込）→ ACTUAL（実績）
+6. v0 UI生成ワークフロー（v0-workflow.md）
+Two-Phase方式:
+
+Phase UI-MOCK: MockBffClientで画面を先に動かす
+Phase UI-BFF: HttpBffClientに差し替えて実BFF接続
+絶対ルール:
+
+UIはDomain APIを直接呼ばない（BFF経由必須）
+UIはcontracts/apiを参照しない（contracts/bffのみ）
+v0生成物は_v0_drop/に隔離→受入チェック→移植
+7. デザインシステム（epm-design-system.md）
+Primary: Deep Teal (#14b8a6)
+Secondary: Royal Indigo (#6366f1)
+コンポーネント: shadcn/ui準拠
+スペーシング: Tailwindスケール使用（任意値禁止）
+8. 主要機能領域（仕様概要より）
+領域	主要機能
+計画系	中期経営計画、予算ガイドライン、予算入力、見込入力
+実績系	実績取込、月次締処理、配賦処理
+KPI系	KPI管理、アクションプラン、カンバン/ガントチャート
+レポート系	予算実績照会、経営会議レポート、ダッシュボード
+マスタ系	組織、科目、ディメンション、プロジェクト、社員
+プロジェクトの全体像を把握しました。何か特定の機能や仕様について詳しく確認したい点があればお知らせください。
+
+データ取込機能の実装を再度確認していきたいので、仕様概要、仕様検討ファイル、
+今時点のhttp://localhost:3000/data-integration/import　にあるモジュールの実装状況のUIやモジュールを詳細に全部確認してください
+データ取込機能の仕様と実装状況を詳細に確認します。
+
+Update Todos
+
+データ取込機能の仕様概要・仕様検討ファイルを確認
+
+data-integration/import の実装状況を確認（UI/BFF/API/Contracts）
+
+現状の実装状況をサマリとして報告
+Read データ取込_タグ機能.md
+Globpattern: ".kiro/specs/仕様検討/*データ取込*.md"
+Found 2 files
+Globpattern: ".kiro/specs/**/data-integration/**/*.md"
+No files found
+Read 20260116_データ取込機能.md
+Read 20260120_データ取込・締処理・権限レビュー.md
+Globpattern: "apps/web/src/features/**/data-integration/**/*"
+No files found
+Update Todos
+
+データ取込機能の仕様概要・仕様検討ファイルを確認
+
+data-integration/import の実装状況を確認（UI/BFF/API/Contracts）
+
+現状の実装状況をサマリとして報告
+Globpattern: "apps/web/src/**/*import*"
+No files found
+Globpattern: "apps/web/src/**/*data-integration*"
+No files found
+Globpattern: "apps/web/src/app/**/import/**/*"
+Found 1 file
+Globpattern: "apps/web/src/app/data-integration/**/*"
+Found 1 file
+Read page.tsx
+Globpattern: "apps/web/src/features/**/*import*/**/*"
+Found 7 files
+Globpattern: "packages/contracts/src/bff/**/import*"
+No files found
+Globpattern: "packages/contracts/src/bff/data-integration/**/*"
+No files found
+UIの実装ファイルが見つかりました。詳細に確認します。
+
+Globpattern: "apps/web/src/features/transactions/data-import/**/*"
+Found 7 files
+Globpattern: "packages/contracts/src/bff/data-import/**/*"
+Found 1 file
+Globpattern: "packages/contracts/src/api/data-import/**/*"
+No files found
+Globpattern: "apps/bff/src/modules/**/data-import/**/*"
+No files found
+Globpattern: "apps/api/src/modules/**/data-import/**/*"
+No files found
+Read page.tsx
+Read BffClient.ts
+Read MockBffClient.ts
+Read index.ts
+残りのコンポーネントとエラーメッセージファイルを確認します。
+
+Read ImportDropzone.tsx
+Read StagingSection.tsx
+Read StagingGrid.tsx
+Read error-messages.ts
+This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.
+
+Summary:
+1. Primary Request and Intent:
+   The user made two sequential requests:
+   
+   **Request 1:** Understand the CCSDD development methodology, Steering files, spec summaries (仕様概要), and comprehend the EPM product being developed. This was an orientation request to grasp the project context.
+   
+   **Request 2:** Review the data import functionality (データ取込機能) in detail, including:
+   - 仕様概要 (spec summary files)
+   - 仕様検討ファイル (spec discussion files)
+   - Current implementation status at `http://localhost:3000/data-integration/import`
+   - All UI modules and implementation details
+
+2. Key Technical Concepts:
+   - **CCSDD (Contract-Centered Specification Driven Development)**: Spec-driven development where contracts are SSoT
+   - **Contracts-first order**: contracts → DB → Domain API → BFF → UI (never reverse)
+   - **Three-tier architecture**: UI → BFF → Domain API → DB (UI cannot access API contracts directly)
+   - **Multi-tenant SaaS with RLS**: All tables have tenant_id, Row Level Security mandatory
+   - **v0 Two-Phase UI Generation**: Phase 1 (UI-MOCK with MockBffClient), Phase 2 (UI-BFF with HttpBffClient)
+   - **SpreadJS (Mescius)**: Used for staging grid in data import
+   - **EPM Domain Concepts**: plan_events, plan_versions, fact_amounts, scenario_type (BUDGET/FORECAST/ACTUAL/MTP/GUIDELINE)
+   - **Data Import Architecture**: Staging tables → Validation → fact_amounts
+   - **5,000 row threshold**: Large data requires pre-aggregation before SpreadJS display
+
+3. Files and Code Sections:
+
+   **Spec Files Read:**
+   - `.kiro/steering/product.md` - EPM SaaS product definition, AI philosophy, target users
+   - `.kiro/steering/development-process.md` - Complete CCSDD workflow (13 steps)
+   - `.kiro/steering/tech.md` - Tech stack (Next.js, NestJS, PostgreSQL, Prisma, Clerk)
+   - `.kiro/steering/structure.md` - Repository structure and SSoT map
+   - `.kiro/steering/v0-workflow.md` - v0 UI generation rules
+   - `.kiro/steering/epm-design-system.md` - Design system (Deep Teal primary, Royal Indigo secondary)
+   - `.kiro/specs/仕様概要/データ取込_タグ機能.md` - Data import overview
+   - `.kiro/specs/仕様検討/20260116_データ取込機能.md` - Comprehensive data import spec (1250 lines)
+   - `.kiro/specs/仕様検討/20260120_データ取込・締処理・権限レビュー.md` - Review notes
+
+   **Implementation Files Read:**
+   
+   - `apps/web/src/app/data-integration/import/page.tsx` - Route entry point
+     ```tsx
+     import DataImportPage from "@/features/transactions/data-import/page"
+     export default function Page() {
+       return <DataImportPage />
+     }
+     ```
+
+   - `apps/web/src/features/transactions/data-import/page.tsx` - Main page (587 lines)
+     - Contains ImportSection and HistorySection components
+     - Uses MockBffClient for all API calls
+     - Step indicator: 取込先選択 → データ取込 → 確認・実行
+     - Import type selection, event/version selection, template selection
+     - ImportDropzone integration for file/paste input
+
+   - `apps/web/src/features/transactions/data-import/api/BffClient.ts` - BFF client interface
+     ```typescript
+     export interface BffClient {
+       startImport(request: BffImportStartRequest): Promise<BffImportStartResponse>
+       startPasteImport(request: BffImportPasteRequest): Promise<BffImportPasteResponse>
+       uploadFile(uploadUrl: string, file: File): Promise<void>
+       getPreMapping(request: BffImportPreMappingRequest): Promise<BffImportPreMappingResponse>
+       applyMapping(request: BffApplyMappingRequest): Promise<BffApplyMappingResponse>
+       aggregate(request: BffImportAggregateRequest): Promise<BffImportAggregateResponse>
+       getStaging(request: BffImportStagingRequest): Promise<BffImportStagingResponse>
+       updateStaging(request: BffUpdateStagingRequest): Promise<BffUpdateStagingResponse>
+       validate(request: BffImportValidateRequest): Promise<BffImportValidateResponse>
+       getAutoFixSuggestions(request: BffGetAutoFixSuggestionsRequest): Promise<BffGetAutoFixSuggestionsResponse>
+       applyAutoFix(request: BffApplyAutoFixRequest): Promise<BffApplyAutoFixResponse>
+       execute(request: BffImportExecuteRequest): Promise<BffImportExecuteResponse>
+       getHistory(request: BffImportHistoryRequest): Promise<BffImportHistoryResponse>
+       getContext(request: BffImportContextRequest): Promise<BffImportContextResponse>
+       getMappingMaster(): Promise<BffMappingMasterResponse>
+       getTemplates(request: BffTemplateListRequest): Promise<BffTemplateListResponse>
+       getBatchStatus(request: BffBatchStatusRequest): Promise<BffBatchStatusResponse>
+     }
+     ```
+
+   - `apps/web/src/features/transactions/data-import/api/MockBffClient.ts` - Complete mock implementation (493 lines)
+     - Implements all BffClient methods with mock data
+     - Creates mock staging data with 12-month columns
+     - Tracks batch state internally
+
+   - `packages/contracts/src/bff/data-import/index.ts` - BFF contracts (585 lines)
+     - All DTOs for data import: ImportType, ImportSourceType, ImportBatchStatus
+     - MappingType, MappingStatus, ValidationSeverity, ColumnMappingTarget
+     - Complete request/response interfaces for all operations
+     - DataImportErrorCode enum with all error codes
+     - LARGE_DATA_THRESHOLD = 5000
+
+   - `apps/web/src/features/transactions/data-import/components/ImportDropzone.tsx` - File upload component (239 lines)
+     - Drag & drop support
+     - Paste mode with tab/comma delimiter parsing
+     - File type validation (.xlsx, .xls, .csv)
+
+   - `apps/web/src/features/transactions/data-import/components/StagingSection.tsx` - Staging area (523 lines)
+     - Shows staging grid with SpreadJS
+     - Row exclusion toggle
+     - Validation and execute workflow
+     - Execute confirmation dialog
+     - Success/failure result display
+
+   - `apps/web/src/features/transactions/data-import/components/StagingGrid.tsx` - SpreadJS grid (232 lines)
+     - Uses @mescius/spread-sheets and @mescius/spread-sheets-react
+     - Checkbox column for row exclusion
+     - Data columns with amount formatting
+     - Status column (OK/エラー/警告/除外)
+     - Frozen header row
+
+   - `apps/web/src/features/transactions/data-import/error-messages.ts` - Error message mapping (83 lines)
+
+   **Files Confirmed NOT to Exist:**
+   - `packages/contracts/src/api/data-import/` - No API contracts
+   - `apps/bff/src/modules/**/data-import/` - No BFF module
+   - `apps/api/src/modules/**/data-import/` - No API module
+
+4. Errors and fixes:
+   - No errors encountered during this review session
+   - The task was purely exploratory/read-only
+
+5. Problem Solving:
+   - Successfully identified all spec documents related to data import
+   - Successfully located and read all current UI implementation files
+   - Identified the gap: UI (Phase 1 MOCK) is complete, but backend (BFF/API) is not implemented
+   - Confirmed the feature is at `apps/web/src/features/transactions/data-import/` (not `apps/web/src/features/data-integration/` as the URL might suggest)
+
+6. All user messages:
+   - "CCSDDによる開発ガイドライン、Steeringファイル各種、仕様概要などこのEPMでしている開発方法と作ろうとしているプロダクトの理解把握をまずおこなってください。"
+   - "データ取込機能の実装を再度確認していきたいので、仕様概要、仕様検討ファイル、今時点のhttp://localhost:3000/data-integration/import　にあるモジュールの実装状況のUIやモジュールを詳細に全部確認してください"
+
+7. Pending Tasks:
+   - Complete the summary report of data import implementation status (was in progress)
+   - The todo list shows:
+     1. ✅ データ取込機能の仕様概要・仕様検討ファイルを確認
+     2. 🔄 data-integration/import の実装状況を確認（UI/BFF/API/Contracts）
+     3. ⏳ 現状の実装状況をサマリとして報告
+
+8. Current Work:
+   I was in the process of reading all implementation files for the data import feature to provide a comprehensive status report. I had just finished reading the last component files:
+   - ImportDropzone.tsx
+   - StagingSection.tsx  
+   - StagingGrid.tsx
+   - error-messages.ts
+   
+   The summary was about to be compiled showing:
+   - **UI Phase 1 (MOCK) is COMPLETE**: All UI components exist with MockBffClient
+   - **Backend NOT IMPLEMENTED**: No API contracts, no BFF module, no API module
+
+9. Optional Next Step:
+   Provide the final summary report to the user documenting:
+   1. Current implementation status of data import feature
+   2. What's implemented (UI with MockBffClient)
+   3. What's missing (API contracts, BFF module, API module, HttpBffClient)
+   4. Alignment with spec documents
+
+   User's exact request: "データ取込機能の実装を再度確認していきたいので、仕様概要、仕様検討ファイル、今時点のhttp://localhost:3000/data-integration/import　にあるモジュールの実装状況のUIやモジュールを詳細に全部確認してください"
+
+   I was about to deliver the comprehensive implementation status summary when the compact request was made.
+
+If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/ktkrr/.claude/projects/-Users-ktkrr-root-10-dev-epm-sdd-trial/8a214493-b1c5-4a95-ab53-cb4068292dc5.jsonl
+Please continue the conversation from where we left it off without asking the user any further questions. Continue with the last task that you were asked to work on.
+データ取込機能の実装状況サマリを報告します。
+
+Update Todos
+
+データ取込機能の仕様概要・仕様検討ファイルを確認
+
+data-integration/import の実装状況を確認（UI/BFF/API/Contracts）
+
+現状の実装状況をサマリとして報告
+データ取込機能（Data Import）実装状況サマリ
+1. 仕様ドキュメント状況
+ドキュメント	パス	状態
+仕様概要	.kiro/specs/仕様概要/データ取込_タグ機能.md	✅ 存在
+仕様検討（詳細）	.kiro/specs/仕様検討/20260116_データ取込機能.md	✅ 1250行の詳細仕様
+レビュー記録	.kiro/specs/仕様検討/20260120_データ取込・締処理・権限レビュー.md	✅ 存在
+requirements.md	.kiro/specs/transactions/data-import/	❌ 未作成
+design.md	.kiro/specs/transactions/data-import/	❌ 未作成
+tasks.md	.kiro/specs/transactions/data-import/	❌ 未作成
+2. レイヤー別実装状況
+UI (apps/web) - Phase 1 MOCK完了 ✅
+ファイル	行数	状態
+page.tsx	587行	✅ 完成
+api/BffClient.ts	16メソッド	✅ インターフェース定義
+api/MockBffClient.ts	493行	✅ モック実装
+api/HttpBffClient.ts	-	❌ 未実装
+components/ImportDropzone.tsx	239行	✅ ファイル/ペースト対応
+components/StagingSection.tsx	523行	✅ バリデーション・実行フロー
+components/StagingGrid.tsx	232行	✅ SpreadJS連携
+error-messages.ts	83行	✅ エラーメッセージマッピング
+Contracts (packages/contracts) - BFF契約のみ
+パス	状態
+packages/contracts/src/bff/data-import/index.ts	✅ 585行のDTO定義
+packages/contracts/src/api/data-import/	❌ 未作成
+BFF (apps/bff) - 未実装 ❌
+項目	状態
+Controller	❌ 未実装
+Service	❌ 未実装
+Module	❌ 未実装
+Domain API (apps/api) - 未実装 ❌
+項目	状態
+Controller	❌ 未実装
+Service	❌ 未実装
+Repository	❌ 未実装
+Module	❌ 未実装
+Database - 未確認
+項目	状態
+import_batches	要確認
+import_staging_rows	要確認
+import_templates	要確認
+3. UI機能実装詳細
+3ステップ構成:
+
+取込先選択 - 取込種別・イベント・バージョン・テンプレート選択
+データ取込 - ファイルアップロード/ペースト入力
+確認・実行 - ステージング表示・バリデーション・自動修正・実行
+対応取込種別:
+
+BUDGET / FORECAST / ACTUAL / MTP / GUIDELINE
+対応入力形式:
+
+Excel (.xlsx, .xls)
+CSV
+クリップボードペースト（タブ/カンマ区切り）
+SpreadJS統合:
+
+@mescius/spread-sheets / @mescius/spread-sheets-react 使用
+行除外チェックボックス
+12ヶ月カラム表示
+ステータス列（OK/エラー/警告/除外）
+4. CCSDD準拠状況
+ステップ	状態	備考
+spec-init	❌	.kiro/specs/transactions/data-import/ 未作成
+spec-requirements	❌	仕様検討ファイルはあるが正式requirements.md未作成
+spec-design	❌	未作成
+spec-tasks	❌	未作成
+Contracts (API)	❌	API契約未定義
+Contracts (BFF)	✅	定義済み
+UI Phase 1 (MOCK)	✅	完成
+UI Phase 2 (BFF)	❌	HttpBffClient未実装
+5. 次のステップ（推奨）
+CCSDDワークフローに従うと、以下の順序で進める必要があります：
+
+/kiro:spec-init "transactions/data-import" - spec初期化
+/kiro:spec-requirements "transactions/data-import" - 仕様検討ファイルを元にrequirements.md作成
+/kiro:spec-design "transactions/data-import" - design.md作成（API/BFF設計含む）
+/kiro:spec-tasks "transactions/data-import" - tasks.md作成
+API Contracts定義
+Domain API実装
+BFF実装
+HttpBffClient実装（UI Phase 2）
+6. 結論
+現状: UI Phase 1 (MOCK) は完成しており、http://localhost:3000/data-integration/import で動作確認可能。ただしバックエンドが未実装のため、実際のデータ永続化は行われない。
+
+課題: CCSDD正式ワークフローが未実行。仕様検討ファイル（20260116_データ取込機能.md）は詳細だが、正式なspec三点セット（requirements/design/tasks）が未作成。
+
+Update Todos
+
+データ取込機能の仕様概要・仕様検討ファイルを確認
+
+data-integration/import の実装状況を確認（UI/BFF/API/Contracts）
+
+現状の実装状況をサマリとして報告
+データ取込機能の実装状況サマリを完了しました。要約すると：
+
+UI Phase 1 (MOCK): ✅ 完成（MockBffClientで動作）
+BFF Contracts: ✅ 定義済み（585行）
+API Contracts / BFF / Domain API: ❌ 未実装
+CCSDD正式spec: ❌ 未作成（仕様検討ファイルは詳細だが正式化されていない）
+次のアクションを指示いただければ対応します。
+
+ここの仕様をEPMとしてどうしたらいいのか、UIUX的にスムーズに取込ができるバイパス機能として仕上げておきたいのです。
+
+ひとまず今は、予算と見込と実績のデータを取り込む想定だけです。
+そうなれば、その標準フォーマットがあり、場合によっては、EPMの仕様側としての標準マッピングに対して、取込したいERPとか外側のフォームを定義して、左右で紐付けしてマッピングする機能などもあったほうがいいのかもとおもいます。
+
+あとは、その先ではマスタも取込できるようにしたいし、その時には取込標準フォーマットを同じく用意する想定にしたらいいかなとおもいます。同じくマッピングできる機能があるといいですね。
+
+加えて、AGGRIDを活用した形で、その標準フォーマットを開いて、EXCELでコピペできて取り込めたりするといいですね。
+
+そのあと取込したけっかは取込履歴一覧としてのこり、取り込み元のデータがEXCEL形式とかでDLできるといいですね。ここまでの仕様を整理できますか。あとはQA壁打ちでBEST仕様を導いてください
+
+今の実装状況もかみして
+ご要望を整理し、QA壁打ちで仕様を詰めていきましょう。
+
+データ取込機能 仕様整理（案）
+1. スコープ整理
+フェーズ	対象データ	優先度
+Phase 1	予算・見込・実績（fact_amounts）	🔴 最優先
+Phase 2	マスタデータ（勘定科目・部門・セグメント等）	🟡 次期
+2. 提案アーキテクチャ
+
+┌─────────────────────────────────────────────────────────────────┐
+│                    データ取込フロー                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
+│  │ 外部フォーマット │ → │  マッピング   │ → │ EPM標準形式  │      │
+│  │ (ERP/Excel)   │    │  定義・変換   │    │             │      │
+│  └──────────────┘    └──────────────┘    └──────────────┘      │
+│                                                │                │
+│                                                ▼                │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
+│  │  AG-Grid     │ ← │ ステージング  │ ← │ バリデーション │      │
+│  │ (編集・確認)  │    │   テーブル   │    │              │      │
+│  └──────────────┘    └──────────────┘    └──────────────┘      │
+│         │                                                      │
+│         ▼                                                      │
+│  ┌──────────────┐    ┌──────────────┐                         │
+│  │   実行確定   │ → │ fact_amounts │                         │
+│  └──────────────┘    └──────────────┘                         │
+│         │                                                      │
+│         ▼                                                      │
+│  ┌──────────────────────────────────┐                         │
+│  │ 取込履歴 + 元ファイルDL可能       │                         │
+│  └──────────────────────────────────┘                         │
+└─────────────────────────────────────────────────────────────────┘
+3. 機能コンポーネント
+A. EPM標準フォーマット
+データ種別	必須カラム	金額カラム
+予算/見込/実績	勘定科目コード, 部門コード, (セグメント)	月別 or 年間
+マスタ（将来）	コード, 名称, 有効開始日, 有効終了日	-
+B. マッピング定義機能
+
+┌─────────────────────────────────────────────────┐
+│ マッピング定義画面                               │
+├────────────────────┬────────────────────────────┤
+│ 外部フォーマット     │ EPM標準フォーマット         │
+├────────────────────┼────────────────────────────┤
+│ GL_CODE           │ → account_code            │
+│ DEPT_ID           │ → department_code         │
+│ AMT_01            │ → amount_m01              │
+│ AMT_02            │ → amount_m02              │
+│ ...               │ → ...                     │
+└────────────────────┴────────────────────────────┘
+│ [テンプレート保存] [適用]                        │
+└─────────────────────────────────────────────────┘
+C. AG-Grid ステージング
+EPM標準フォーマットで表示
+Excel互換コピペ（Ctrl+V）
+セル単位編集
+行追加/削除
+バリデーションエラー表示（セル色分け）
+D. 取込履歴
+カラム	説明
+取込日時	実行タイムスタンプ
+取込種別	予算/見込/実績
+対象イベント	plan_event名
+対象バージョン	plan_version名
+件数	成功/失敗/合計
+元ファイル	DLリンク（Excel形式）
+実行者	ユーザー名
+QA壁打ち（仕様確定のための質問）
+Q1. マッピング定義の保存単位
+マッピングテンプレートはどのレベルで保存・再利用しますか？
+
+テナント共通 - 全ユーザーが使える共有テンプレート
+ユーザー個人 - 自分専用のマッピングを保存
+両方 - 共有テンプレート + 個人テンプレート
+→ ERPからの定期取込を想定すると、「ERPソース名 + マッピング定義」をテナント共通で管理するのが自然ですが、いかがでしょうか？
+
+Q2. 取込フローの入口
+現状の実装は「取込種別選択 → イベント/バージョン選択 → ファイル取込」ですが、マッピングを絡めるとフローが変わります。
+
+案A: マッピング後付け型（現状ベース）
+
+
+ファイル取込 → カラム自動検出 → マッピング選択/編集 → ステージング
+案B: マッピング先行型
+
+
+マッピングテンプレート選択 → ファイル取込 → 自動変換 → ステージング
+案C: ハイブリッド
+
+
+ファイル取込 → 「既存テンプレート適用」or「新規マッピング作成」を選択
+どれがERPからの定期運用に合いますか？
+
+Q3. AG-Grid vs SpreadJS
+現状はSpreadJS（Mescius）で実装済みです。AG-Gridに変更する理由は？
+
+観点	SpreadJS	AG-Grid
+Excel互換性	◎ 高い	○ 中程度
+ライセンス	有償	Community版あり
+大量データ	○ 仮想化対応	◎ 仮想化強い
+既存実装	✅ 実装済み	❌ 要移行
+確認: AG-Gridへの移行は必須要件ですか？それともSpreadJS継続でも可？
+
+Q4. 元ファイルDLの形式
+取込履歴から元ファイルをDLする際、どの形式が必要ですか？
+
+元のまま - アップロードしたファイルをそのまま保存
+EPM標準形式に変換後 - マッピング適用後の形式でDL
+両方 - 元ファイル + 変換後の両方
+ストレージコストとの兼ね合いもありますが、監査証跡として「元のまま」は必要でしょうか？
+
+Q5. バリデーションエラー時の挙動
+エラーがある行の扱いをどうしますか？
+
+全件ブロック - 1件でもエラーがあれば全件取込不可
+エラー行スキップ - 正常行のみ取込、エラー行は除外
+ユーザー選択 - 「エラー行を除外して取込」「全件キャンセル」を選べる
+現状の実装は「行除外チェックボックス」があるので3に近いですが、運用上どれが望ましいですか？
+
+Q6. マスタ取込との統合度
+将来のマスタ取込は、同じ画面/フローで統合しますか？
+
+完全統合 - 同じ画面で「取込種別」にマスタを追加
+別画面 - マスタ取込は別メニュー（/data-integration/master-import）
+画面共通・フロー分岐 - 入口は同じ、種別選択後に専用フローへ
+EPMの管理観点では、マスタ管理は権限が異なることが多いので「別画面」が自然かもしれませんが、いかがでしょうか？
+
+これらの回答をいただければ、仕様を確定してrequirements.mdとdesign.mdに落とし込めます。
+
+テナント共通 - 全ユーザーが使える共有テンプレート　ただしカンパニー単位です。
+マッピングってフォーマットに対して、先に設定画面で設定しておく感じですか。それとも取り込みの時ですか。もし取り込みの時なら、その情報は保存される想定ですか
+
+それらを髪したときにベストなUIUXはプロとしてはどれですか
+AG-Gridのほうがモダンなので。EXCELごかんもそこまでがちがちでなくていいです
+元のまま - アップロードしたファイルをそのまま保存
+Q5. バリデーションエラー時の挙動　ベストはどれですか
+完全統合 - 同じ画面で「取込種別」にマスタを追加
+いい質問です。プロとしての推奨を含めて整理します。
+
+Q2補足: マッピング設定タイミング
+選択肢の整理
+パターン	説明	メリット	デメリット
+A. 事前設定のみ	設定画面で先にマッピング定義 → 取込時は選択のみ	運用が安定、権限分離しやすい	初回セットアップが面倒
+B. 取込時のみ	取込時にマッピング作成、保存は任意	柔軟、すぐ使える	毎回設定が面倒、属人化
+C. ハイブリッド	取込時に作成可能、保存して再利用も可能	柔軟性と効率の両立	UI複雑化のリスク
+🎯 プロ推奨: パターンC（ハイブリッド）+ スマートデフォルト
+理由:
+
+初回利用の障壁を下げる - 設定画面を先に触らなくても取込開始できる
+定期運用の効率化 - 一度作ったマッピングを保存して再利用
+EPM実務の実態 - ERPからの定期取込（保存テンプレ使用）と、アドホックな修正取込（その場マッピング）が混在
+推奨UXフロー:
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│ STEP 1: ファイルアップロード                                     │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │  ドラッグ＆ドロップ or ファイル選択                          │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                            ↓                                    │
+│ STEP 2: マッピング選択                                          │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ ○ 保存済みマッピングを使用                                   │ │
+│ │   [SAP FI標準 ▼] [Oracle EBS ▼] [+新規作成]                 │ │
+│ │                                                             │ │
+│ │ ○ 自動検出（カラム名から推測）← デフォルト選択               │ │
+│ │   → 検出結果を確認・微調整可能                              │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                            ↓                                    │
+│ STEP 3: マッピング確認・編集                                    │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ 取込ファイル          EPM標準                               │ │
+│ │ ─────────────────────────────────────────────────           │ │
+│ │ GL_CODE        →    account_code      ✓ 自動検出            │ │
+│ │ DEPT           →    department_code   ✓ 自動検出            │ │
+│ │ JAN_AMT        →    amount_m01        ⚠ 要確認              │ │
+│ │ COST_CENTER    →    [未マッピング ▼]   ← ドロップダウン選択  │ │
+│ │                                                             │ │
+│ │ □ このマッピングを保存する                                   │ │
+│ │   名前: [________________]                                  │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                            ↓                                    │
+│ STEP 4: プレビュー（AG-Grid）→ 確認・実行                       │
+└─────────────────────────────────────────────────────────────────┘
+ポイント:
+
+「自動検出」をデフォルトにして、初回でもすぐ使える
+保存済みマッピングがあればワンクリックで適用
+「このマッピングを保存する」チェックで、良いマッピングだけ残す
+Q5: バリデーションエラー時の挙動
+🎯 プロ推奨: オプション3（ユーザー選択）+ 明示的アクション
+理由:
+
+財務データの整合性 - 全件ブロックは安全だが、99件OK/1件NGで全部やり直しは非効率
+監査対応 - 「何を除外したか」の記録が必要
+ユーザー責任の明確化 - 暗黙のスキップは危険、明示的な除外操作を求める
+推奨UX:
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│ バリデーション結果                                              │
+├─────────────────────────────────────────────────────────────────┤
+│  ✅ 正常: 248件  ❌ エラー: 3件  ⚠️ 警告: 12件                  │
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ [AG-Grid: エラー行がハイライト表示]                         │ │
+│ │ 行5:  勘定科目コード「9999」が存在しません                   │ │
+│ │ 行12: 金額が数値ではありません「N/A」                        │ │
+│ │ 行45: 部門コード「D999」は無効です                           │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ 取込オプション:                                             │ │
+│ │ ○ エラーを修正してから取込（グリッドで直接編集可能）         │ │
+│ │ ○ エラー行を除外して取込（248件のみ取込）← 除外理由を記録    │ │
+│ │ ○ キャンセル（全件取込しない）                              │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ [キャンセル]                              [選択した方法で実行]  │
+└─────────────────────────────────────────────────────────────────┘
+除外時の監査記録:
+
+
+取込履歴に保存:
+- 除外行数: 3件
+- 除外理由: ユーザー明示的除外（バリデーションエラー）
+- 除外行の詳細: 元ファイルと共にDL可能
+確定仕様サマリ
+項目	決定内容
+マッピングスコープ	カンパニー単位（テナント内カンパニー共有）
+マッピングタイミング	ハイブリッド（取込時作成可 + 保存して再利用可）
+グリッド	AG-Grid（SpreadJSから移行）
+元ファイル保存	元のまま保存、DL可能
+エラー時挙動	ユーザー選択（修正/除外/キャンセル）
+マスタ取込	完全統合（同画面で取込種別選択）
+追加確認事項
+Q7. カンパニー単位の確認
+「カンパニー」は既存のマスタ構造で言うと以下のどれですか？
+
+companies テーブル（法人マスタ）
+organization_units の特定レベル（組織階層の一部）
+その他
+マッピングテンプレートの保存先を決めるために確認させてください。
+
+Q8. 自動検出ロジックの賢さ
+カラム名からの自動検出はどこまで賢くしますか？
+
+シンプル - 完全一致 or 定義済みエイリアス（GL_CODE = account_code）
+中程度 - 部分一致 + よくあるパターン認識（*_AMT → amount系）
+AI支援 - カラム名+サンプルデータからLLMが推測
+Phase 1は1か2で十分だと思いますが、将来的にAI支援も視野に入れますか？
+
+Q9. 取込種別の拡張
+現在「予算/見込/実績」ですが、将来マスタを追加する際の分類は？
+
+
+取込種別:
+├── 金額データ
+│   ├── 予算（BUDGET）
+│   ├── 見込（FORECAST）
+│   └── 実績（ACTUAL）
+└── マスタデータ
+    ├── 勘定科目
+    ├── 部門
+    ├── セグメント
+    └── ...
+この階層構造でUIを作る想定でよいですか？
+
+プロ推奨: パターンC（ハイブリッド）+ スマートデフォルト
+プロ推奨: オプション3（ユーザー選択）+ 明示的アクション
+companies　親会社とか子会社によって取り込みフォームちがいますよね
+Phase 1は1か2で十分だと思いますが、将来的にAI支援も視野に入れる
+はい
+了解しました。すべての仕様が確定しました。
+
+最終仕様書（確定版）
+1. 機能概要
+項目	内容
+機能名	データ取込（Data Import）
+目的	ERP/外部システムからEPMへ金額・マスタデータを効率的に取り込む
+URL	/data-integration/import
+2. 取込種別階層
+
+取込種別
+├── 金額データ
+│   ├── 予算（BUDGET）
+│   ├── 見込（FORECAST）
+│   └── 実績（ACTUAL）
+└── マスタデータ（Phase 2）
+    ├── 勘定科目（accounts）
+    ├── 部門（departments）
+    ├── セグメント（segments）
+    └── プロダクト（products）
+3. マッピング機能仕様
+3.1 スコープ
+保存単位: カンパニー（companiesテーブル）
+理由: 親会社・子会社でERPが異なり、フォーマットが違う
+3.2 マッピングテンプレート構造
+
+interface ImportMappingTemplate {
+  id: string;
+  company_id: string;           // カンパニー単位
+  name: string;                 // 例: "SAP FI標準", "Oracle EBS"
+  import_category: 'AMOUNT' | 'MASTER';
+  import_type: string;          // BUDGET, FORECAST, ACTUAL, ACCOUNT, etc.
+  column_mappings: ColumnMapping[];
+  created_by: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+interface ColumnMapping {
+  source_column: string;        // 取込ファイルのカラム名
+  target_field: string;         // EPM標準フィールド
+  transform_rule?: string;      // 変換ルール（将来拡張）
+}
+3.3 自動検出ロジック
+Phase	検出方式	例
+Phase 1	完全一致 + エイリアス辞書	GL_CODE → account_code
+Phase 1	パターンマッチ	*_AMT, *_AMOUNT → amount_*
+Phase 2	AI支援	カラム名+サンプルデータからLLM推測
+エイリアス辞書例:
+
+
+const COLUMN_ALIASES = {
+  account_code: ['GL_CODE', 'ACCOUNT', 'ACC_CD', '勘定科目コード', '科目'],
+  department_code: ['DEPT', 'DEPT_CD', 'COST_CENTER', '部門コード', '部門'],
+  amount_m01: ['JAN', 'JAN_AMT', '1月', 'M01'],
+  // ...
+};
+4. UXフロー（確定版）
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 1: 取込種別・対象選択                                          │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  カンパニー:    [株式会社ABC ▼]                                     │
+│                                                                     │
+│  取込カテゴリ:  ○ 金額データ  ○ マスタデータ                        │
+│                                                                     │
+│  取込種別:      [予算 ▼]  ← 金額: 予算/見込/実績                    │
+│                           ← マスタ: 勘定科目/部門/セグメント...     │
+│                                                                     │
+│  （金額データの場合）                                                │
+│  予算イベント:  [2026年度予算 ▼]                                    │
+│  バージョン:    [v1 - 初版 ▼]                                       │
+│                                                                     │
+│                                              [次へ →]               │
+└─────────────────────────────────────────────────────────────────────┘
+                                ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 2: ファイルアップロード                                        │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │                                                               │  │
+│  │     📁 ファイルをドラッグ＆ドロップ                            │  │
+│  │        または クリックして選択                                 │  │
+│  │                                                               │  │
+│  │     対応形式: Excel (.xlsx, .xls), CSV                        │  │
+│  │                                                               │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+│  💡 Excelからコピーして、次のステップで直接ペーストも可能です        │
+│                                                                     │
+│                                  [← 戻る]        [次へ →]           │
+└─────────────────────────────────────────────────────────────────────┘
+                                ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 3: マッピング設定                                              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  マッピング方法:                                                    │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │ ○ 保存済みテンプレートを使用                                  │  │
+│  │   [SAP FI標準 ▼] [Oracle EBS ▼] [+ 新規作成]                  │  │
+│  │                                                               │  │
+│  │ ● 自動検出（推奨）                                            │  │
+│  │   カラム名から自動でマッピングを推測します                     │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+│  マッピング確認・編集:                                              │
+│  ┌─────────────────────┬─────────────────────┬──────────────────┐  │
+│  │ 取込ファイル         │ EPM標準             │ ステータス        │  │
+│  ├─────────────────────┼─────────────────────┼──────────────────┤  │
+│  │ GL_CODE             │ account_code    [▼] │ ✓ 自動検出       │  │
+│  │ DEPT                │ department_code [▼] │ ✓ 自動検出       │  │
+│  │ JAN_AMT             │ amount_m01      [▼] │ ✓ パターン一致   │  │
+│  │ SEGMENT             │ segment_code    [▼] │ ⚠ 要確認         │  │
+│  │ MEMO                │ [未マッピング]  [▼] │ ─ スキップ       │  │
+│  └─────────────────────┴─────────────────────┴──────────────────┘  │
+│                                                                     │
+│  □ このマッピングをテンプレートとして保存                           │
+│    テンプレート名: [________________________]                       │
+│                                                                     │
+│                                  [← 戻る]        [次へ →]           │
+└─────────────────────────────────────────────────────────────────────┘
+                                ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 4: プレビュー・編集（AG-Grid）                                 │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  📊 プレビュー  全258件  ✅ 正常: 255件  ❌ エラー: 3件             │
+│                                                                     │
+│  [フィルタ: すべて ▼] [エラーのみ表示] [Excelからペースト]          │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────────┐│
+│  │ AG-Grid                                                        ││
+│  │ ┌──┬────────┬──────┬─────────┬────────┬────────┬─────┐        ││
+│  │ │☑│勘定科目 │部門   │セグメント│ 1月    │ 2月    │...  │        ││
+│  │ ├──┼────────┼──────┼─────────┼────────┼────────┼─────┤        ││
+│  │ │☑│4110    │D001  │S01      │ 100,000│ 120,000│     │ ✓     ││
+│  │ │☑│4120    │D002  │S01      │  80,000│  85,000│     │ ✓     ││
+│  │ │☐│9999    │D001  │S01      │  50,000│  55,000│     │ ❌    ││
+│  │ │  │        │      │         │        │        │     │        ││
+│  │ │  │ ↑ 行5: 勘定科目コード「9999」が存在しません      │        ││
+│  │ └──┴────────┴──────┴─────────┴────────┴────────┴─────┘        ││
+│  │                                                                ││
+│  │ セル編集可能 / Ctrl+V でExcelからペースト可能                   ││
+│  └─────────────────────────────────────────────────────────────────┘│
+│                                                                     │
+│                                  [← 戻る]        [次へ →]           │
+└─────────────────────────────────────────────────────────────────────┘
+                                ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 5: 確認・実行                                                  │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  取込内容確認:                                                      │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │ カンパニー:     株式会社ABC                                   │  │
+│  │ 取込種別:       予算                                          │  │
+│  │ 予算イベント:   2026年度予算                                  │  │
+│  │ バージョン:     v1 - 初版                                     │  │
+│  │ 取込件数:       255件（3件除外）                              │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+│  ⚠️ 3件のエラー行があります                                         │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │ ○ エラー行を除外して取込（255件のみ）                         │  │
+│  │   → 除外行は履歴に記録されます                                │  │
+│  │                                                               │  │
+│  │ ○ キャンセル（取込しない）                                    │  │
+│  │   → 戻ってエラーを修正できます                                │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+│                                  [← 戻る]        [実行]             │
+└─────────────────────────────────────────────────────────────────────┘
+                                ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ 完了                                                                │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ✅ 取込が完了しました                                              │
+│                                                                     │
+│  取込結果:                                                          │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │ 成功:   255件                                                 │  │
+│  │ 除外:   3件（エラーのため）                                   │  │
+│  │ 合計:   258件                                                 │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+│  [取込履歴を見る]  [新しい取込を開始]                                │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+5. 取込履歴仕様
+5.1 一覧表示
+カラム	説明
+取込日時	実行タイムスタンプ
+カンパニー	対象カンパニー名
+取込カテゴリ	金額データ / マスタデータ
+取込種別	予算/見込/実績/勘定科目/部門...
+対象	イベント名 + バージョン名（金額の場合）
+件数	成功/除外/合計
+元ファイル	DLリンク
+実行者	ユーザー名
+5.2 元ファイル保存
+保存形式: アップロードされたファイルそのまま
+保存先: オブジェクトストレージ（S3互換）
+保持期間: 設定可能（デフォルト: 1年）
+監査対応: 除外行の詳細も含めてDL可能
+6. データモデル（追加）
+
+-- マッピングテンプレート
+CREATE TABLE import_mapping_templates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  company_id UUID NOT NULL REFERENCES companies(id),
+  name VARCHAR(100) NOT NULL,
+  import_category VARCHAR(20) NOT NULL, -- 'AMOUNT' | 'MASTER'
+  import_type VARCHAR(20) NOT NULL,     -- 'BUDGET', 'ACCOUNT', etc.
+  column_mappings JSONB NOT NULL,
+  created_by UUID NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(tenant_id, company_id, name)
+);
+
+-- 取込履歴（拡張）
+ALTER TABLE import_batches ADD COLUMN company_id UUID REFERENCES companies(id);
+ALTER TABLE import_batches ADD COLUMN import_category VARCHAR(20);
+ALTER TABLE import_batches ADD COLUMN original_file_path VARCHAR(500);
+ALTER TABLE import_batches ADD COLUMN excluded_rows_count INT DEFAULT 0;
+ALTER TABLE import_batches ADD COLUMN mapping_template_id UUID REFERENCES import_mapping_templates(id);
+7. 技術変更点
+完璧です。仕様が固まってきました。
+
+確定仕様書（Final）
+1. 機能概要
+データ取込機能は、外部システム（ERP等）からEPMへ金額データ・マスタデータを取り込むバイパス機能。カンパニー別のマッピングテンプレートにより、異なるフォーマットを統一的に処理する。
+
+2. データモデル（マッピング関連）
+
+┌─────────────────────────────────────────────────────────────────┐
+│ import_mapping_templates（マッピングテンプレート）               │
+├─────────────────────────────────────────────────────────────────┤
+│ id: UUID                                                        │
+│ tenant_id: UUID (RLS)                                           │
+│ company_id: UUID → companies.id                                 │
+│ name: VARCHAR(100)  -- 例: "SAP FI 標準", "Oracle EBS"          │
+│ import_type: ENUM   -- AMOUNT | MASTER                          │
+│ target_type: VARCHAR -- 金額: BUDGET/FORECAST/ACTUAL            │
+│                      -- マスタ: ACCOUNT/DEPARTMENT/SEGMENT...   │
+│ source_system: VARCHAR(50)  -- 例: "SAP", "Oracle", "Manual"    │
+│ column_mappings: JSONB      -- マッピング定義                    │
+│ is_default: BOOLEAN         -- このカンパニーのデフォルト        │
+│ created_at / updated_at / created_by                            │
+└─────────────────────────────────────────────────────────────────┘
+
+column_mappings 例:
+{
+  "mappings": [
+    { "source": "GL_CODE", "target": "account_code", "transform": null },
+    { "source": "DEPT_ID", "target": "department_code", "transform": null },
+    { "source": "JAN_AMT", "target": "amount_m01", "transform": "number" },
+    { "source": "FEB_AMT", "target": "amount_m02", "transform": "number" }
+  ],
+  "options": {
+    "skipHeaderRows": 1,
+    "dateFormat": "YYYY-MM-DD",
+    "numberFormat": { "decimal": ".", "thousands": "," }
+  }
+}
+3. 画面構成
+
+/data-integration/import
+├── 取込画面（メイン）
+│   ├── Step 1: 取込種別・対象選択
+│   ├── Step 2: ファイルアップロード + マッピング
+│   ├── Step 3: AG-Grid プレビュー・編集
+│   └── Step 4: バリデーション・実行
+│
+├── 取込履歴一覧
+│   └── 履歴詳細（元ファイルDL）
+│
+└── [設定] マッピングテンプレート管理（オプション経路）
+    └── カンパニー別テンプレート一覧・編集
+4. 取込フロー詳細
+Step 1: 取込種別・対象選択
+
+┌─────────────────────────────────────────────────────────────────┐
+│ データ取込                                                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ 取込種別                                                        │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ 金額データ                                                  │ │
+│ │ ┌─────────┐ ┌─────────┐ ┌─────────┐                        │ │
+│ │ │  予算   │ │  見込   │ │  実績   │                        │ │
+│ │ │ BUDGET  │ │FORECAST │ │ ACTUAL  │                        │ │
+│ │ └─────────┘ └─────────┘ └─────────┘                        │ │
+│ ├─────────────────────────────────────────────────────────────┤ │
+│ │ マスタデータ                              [Phase 2で追加]   │ │
+│ │ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐            │ │
+│ │ │勘定科目 │ │  部門   │ │セグメント│ │  その他 │            │ │
+│ │ └─────────┘ └─────────┘ └─────────┘ └─────────┘            │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ 対象選択（金額データの場合）                                     │
+│ カンパニー:  [株式会社ABC ▼]  ← 権限のあるカンパニーのみ表示    │
+│ 計画イベント: [2026年度予算 ▼]                                  │
+│ バージョン:   [Ver.1 (作業中) ▼]                                │
+│                                                                 │
+│                                              [次へ: ファイル選択]│
+└─────────────────────────────────────────────────────────────────┘
+Step 2: ファイルアップロード + マッピング
+
+┌─────────────────────────────────────────────────────────────────┐
+│ ファイルアップロード                                            │
+├─────────────────────────────────────────────────────────────────┤
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │                                                             │ │
+│ │     📁 ファイルをドラッグ＆ドロップ                         │ │
+│ │        または [ファイルを選択]                              │ │
+│ │                                                             │ │
+│ │     対応形式: Excel (.xlsx, .xls), CSV                      │ │
+│ │                                                             │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ ── または ──                                                    │
+│                                                                 │
+│ [クリップボードから貼り付け] ← Excelからコピペ可能              │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│ マッピング設定                         ファイル読込後に表示     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ ○ 保存済みマッピングを使用                                      │
+│   [SAP FI 標準 (株式会社ABC) ▼]                                │
+│                                                                 │
+│ ● 自動検出（推奨）                      ← デフォルト選択        │
+│   カラム名から自動的にマッピングを推測します                    │
+│                                                                 │
+│ ○ 新規マッピングを作成                                          │
+│                                                                 │
+│                                          [次へ: プレビュー確認] │
+└─────────────────────────────────────────────────────────────────┘
+Step 3: マッピング確認 + AG-Grid プレビュー
+
+┌─────────────────────────────────────────────────────────────────┐
+│ マッピング確認                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│ 取込ファイル           →    EPM標準              ステータス     │
+│ ──────────────────────────────────────────────────────────────  │
+│ GL_CODE               →    account_code          ✅ 自動検出    │
+│ DEPT                  →    department_code       ✅ 自動検出    │
+│ SEGMENT               →    segment_code          ✅ 自動検出    │
+│ JAN                   →    amount_m01            ✅ 自動検出    │
+│ FEB                   →    amount_m02            ✅ 自動検出    │
+│ ...                                                             │
+│ UNKNOWN_COL           →    [選択してください ▼]  ⚠️ 要設定      │
+│                                                                 │
+│ □ このマッピングを保存する                                      │
+│   名前: [新規ERPフォーマット    ]                               │
+├─────────────────────────────────────────────────────────────────┤
+│ データプレビュー（変換後）                    248行 読み込み済み │
+├─────────────────────────────────────────────────────────────────┤
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ [AG-Grid]                                                   │ │
+│ │ ☑│勘定科目  │部門    │セグメント│ 1月    │ 2月    │...│状態│ │
+│ │──┼─────────┼────────┼─────────┼────────┼────────┼───┼────│ │
+│ │☑ │511000   │D001    │S01      │100,000 │120,000 │...│ OK │ │
+│ │☑ │511000   │D002    │S01      │ 80,000 │ 85,000 │...│ OK │ │
+│ │☐ │999999   │D001    │S01      │ 50,000 │ 55,000 │...│ ❌ │ │
+│ │☑ │512000   │D003    │S02      │200,000 │210,000 │...│ OK │ │
+│ │  │         │        │         │        │        │   │    │ │
+│ │ ← セル直接編集可能、行の除外チェック可能 →                  │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│                                          [次へ: バリデーション] │
+└─────────────────────────────────────────────────────────────────┘
+Step 4: バリデーション・実行
+
+┌─────────────────────────────────────────────────────────────────┐
+│ バリデーション結果                                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ✅ 正常: 245件   ❌ エラー: 3件   ⚠️ 警告: 12件                │
+│                                                                 │
+│ エラー詳細                                         [展開/折畳]  │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ 行3:  勘定科目コード「999999」がマスタに存在しません         │ │
+│ │ 行15: 部門コード「D999」は無効です                           │ │
+│ │ 行42: 金額「N/A」は数値ではありません                        │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ 警告詳細                                           [展開/折畳]  │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ 行8:  同一キーのデータが既に存在します（上書きされます）     │ │
+│ │ 行20: 金額が0です                                            │ │
+│ │ ...                                                         │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│ 取込オプション                                                  │
+│                                                                 │
+│ ○ エラーを修正してから取込                                      │
+│   → プレビューに戻ってグリッドで直接編集                       │
+│                                                                 │
+│ ● エラー行を除外して取込（245件のみ）                           │
+│   ⚠️ 除外された3件は取込履歴に記録されます                      │
+│                                                                 │
+│ ○ キャンセル（全件取込しない）                                  │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ [戻る]                                    [取込を実行]          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+5. 取込履歴
+
+┌─────────────────────────────────────────────────────────────────┐
+│ 取込履歴                                                        │
+├─────────────────────────────────────────────────────────────────┤
+│ カンパニー: [全て ▼]  種別: [全て ▼]  期間: [過去30日 ▼]       │
+├─────────────────────────────────────────────────────────────────┤
+│ 取込日時        │種別  │対象          │件数      │実行者│操作  │
+│ ────────────────┼──────┼──────────────┼──────────┼──────┼───── │
+│ 2026/02/05 14:30│予算  │2026予算 Ver.1│245/248   │田中  │[DL]  │
+│ 2026/02/04 10:15│実績  │2026/01 実績  │1,200/1200│佐藤  │[DL]  │
+│ 2026/02/03 09:00│見込  │2026Q1 FC     │500/512   │田中  │[DL]  │
+│ ...                                                             │
+└─────────────────────────────────────────────────────────────────┘
+
+[DL] クリック時:
+├── 元ファイル（アップロード時のまま）
+└── 取込結果サマリ（成功/除外の詳細）
+6. 自動検出ロジック（Phase 1）
+検出方法	例
+完全一致	account_code → account_code
+エイリアス	GL_CODE, 勘定科目コード, Account → account_code
+パターン	*_AMT, *金額, AMT_* → amount系
+月名パターン	JAN, 1月, M01, 202601 → amount_m01
+将来（AI支援）:
+
+カラム名 + サンプルデータ5行をLLMに渡して推測
+推測結果は「AI提案」としてユーザー確認を求める
+7. 技術変更点（現状からの差分）
+項目	現状	変更後
+グリッド	SpreadJS	AG-Grid
+マッピング	固定	動的テンプレート
+保存単位	なし	カンパニー別
+履歴DL	なし	元ファイル保存
+次のアクション
+この仕様で進めてよろしければ、CCSDD正式ワークフローに従って以下を作成します：
+
+/kiro:spec-init "transactions/data-import" - spec初期化
+/kiro:spec-requirements - requirements.md作成
+/kiro:spec-design - design.md作成（API/BFF/UI設計）
+/kiro:spec-tasks - tasks.md作成
+確認: この仕様で正式specを作成してよいですか？または追加の調整がありますか？

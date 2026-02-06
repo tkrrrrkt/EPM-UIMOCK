@@ -22,6 +22,8 @@ import type {
   BffDashboardSelectorsRequestDto,
   BffDashboardSelectorsResponseDto,
   BffKpiDefinitionOptionListDto,
+  BffSubjectSelectorResponse,
+  BffMetricSelectorResponse,
   OwnerType,
   WidgetType,
   DataSourceType,
@@ -33,7 +35,7 @@ import type {
 // Mock Data
 // ============================================================
 
-const mockDashboards: BffDashboardDto[] = [
+let mockDashboards: BffDashboardDto[] = [
   {
     id: 'dash-001',
     name: '経営ダッシュボード',
@@ -75,7 +77,7 @@ const mockDashboards: BffDashboardDto[] = [
   },
 ];
 
-const mockWidgets: Record<string, BffWidgetDto[]> = {
+let mockWidgets: Record<string, BffWidgetDto[]> = {
   'dash-001': [
     {
       id: 'widget-001',
@@ -175,6 +177,28 @@ const mockWidgets: Record<string, BffWidgetDto[]> = {
         showLegend: true,
       },
       sortOrder: 4,
+    },
+    {
+      id: 'widget-005',
+      widgetType: 'TABLE' as WidgetType,
+      title: '月次売上データ比較',
+      layout: { row: 4, col: 0, sizeX: 6, sizeY: 3 },
+      dataConfig: {
+        sources: [
+          {
+            type: 'FACT' as DataSourceType,
+            refId: 'fact-revenue',
+            label: '売上高',
+          },
+        ],
+      },
+      filterConfig: {
+        useGlobal: true,
+      },
+      displayConfig: {
+        showCompareColumns: true,
+      },
+      sortOrder: 5,
     },
   ],
 };
@@ -281,6 +305,86 @@ const mockTemplates: BffDashboardTemplateListDto = {
       name: '部門ダッシュボード（テンプレート）',
       description: '部門管理者向けテンプレート',
       widgetCount: 4,
+    },
+  ],
+};
+
+const mockSubjectSelector: BffSubjectSelectorResponse = {
+  items: [
+    {
+      stableId: 'subject-001',
+      subjectCode: '1000',
+      subjectName: '売上高',
+      parentStableId: null,
+      level: 1,
+    },
+    {
+      stableId: 'subject-002',
+      subjectCode: '1100',
+      subjectName: '国内売上',
+      parentStableId: 'subject-001',
+      level: 2,
+    },
+    {
+      stableId: 'subject-003',
+      subjectCode: '1200',
+      subjectName: '海外売上',
+      parentStableId: 'subject-001',
+      level: 2,
+    },
+    {
+      stableId: 'subject-004',
+      subjectCode: '2000',
+      subjectName: '売上原価',
+      parentStableId: null,
+      level: 1,
+    },
+    {
+      stableId: 'subject-005',
+      subjectCode: '3000',
+      subjectName: '営業費',
+      parentStableId: null,
+      level: 1,
+    },
+    {
+      stableId: 'subject-006',
+      subjectCode: '4000',
+      subjectName: '営業利益',
+      parentStableId: null,
+      level: 1,
+    },
+  ],
+};
+
+const mockMetricSelector: BffMetricSelectorResponse = {
+  items: [
+    {
+      id: 'metric-001',
+      metricCode: 'MTR-ROE',
+      metricName: '自己資本利益率',
+      metricType: 'FIN_METRIC',
+      unit: '%',
+    },
+    {
+      id: 'metric-002',
+      metricCode: 'MTR-ROA',
+      metricName: '総資産利益率',
+      metricType: 'FIN_METRIC',
+      unit: '%',
+    },
+    {
+      id: 'metric-003',
+      metricCode: 'MTR-OPM',
+      metricName: '営業利益率',
+      metricType: 'FIN_METRIC',
+      unit: '%',
+    },
+    {
+      id: 'metric-004',
+      metricCode: 'MTR-GRM',
+      metricName: '粗利率',
+      metricType: 'FIN_METRIC',
+      unit: '%',
     },
   ],
 };
@@ -393,6 +497,26 @@ export const mockBffClient: BffClient = {
       })) || [],
     };
 
+    // Add to mockDashboards so it can be retrieved later
+    mockDashboards.push({
+      id: newDashboard.id,
+      name: newDashboard.name,
+      description: newDashboard.description,
+      ownerType: newDashboard.ownerType,
+      ownerId: newDashboard.ownerId,
+      isActive: newDashboard.isActive,
+      sortOrder: newDashboard.sortOrder,
+      createdAt: newDashboard.createdAt,
+      updatedAt: newDashboard.updatedAt,
+      createdBy: newDashboard.createdBy,
+      updatedBy: newDashboard.updatedBy,
+    });
+
+    // Add widgets to mockWidgets if any
+    if (newDashboard.widgets.length > 0) {
+      mockWidgets[newDashboard.id] = newDashboard.widgets;
+    }
+
     return newDashboard;
   },
 
@@ -402,14 +526,24 @@ export const mockBffClient: BffClient = {
   async updateDashboard(id: string, data: BffUpdateDashboardDto): Promise<BffDashboardDetailDto> {
     await new Promise((resolve) => setTimeout(resolve, 400));
 
-    const dashboard = await mockBffClient.getDashboard(id);
+    // Find dashboard in mock data
+    const dashboardIndex = mockDashboards.findIndex((d) => d.id === id);
+    if (dashboardIndex === -1) {
+      throw new Error(`Dashboard not found: ${id}`);
+    }
 
-    return {
-      ...dashboard,
-      name: data.name || dashboard.name,
-      description: data.description !== undefined ? data.description : dashboard.description,
-      globalFilterConfig: data.globalFilterConfig || dashboard.globalFilterConfig,
-      widgets: data.widgets?.map((w, idx) => ({
+    // Update dashboard base data
+    mockDashboards[dashboardIndex] = {
+      ...mockDashboards[dashboardIndex],
+      name: data.name || mockDashboards[dashboardIndex].name,
+      description: data.description !== undefined ? data.description : mockDashboards[dashboardIndex].description,
+      updatedAt: new Date().toISOString(),
+      updatedBy: 'current-user',
+    };
+
+    // Update widgets in mock data
+    if (data.widgets && data.widgets.length > 0) {
+      const updatedWidgets = data.widgets.map((w, idx) => ({
         id: w.id || `widget-${Date.now()}-${idx}`,
         widgetType: w.widgetType,
         title: w.title,
@@ -418,10 +552,12 @@ export const mockBffClient: BffClient = {
         filterConfig: w.filterConfig,
         displayConfig: w.displayConfig,
         sortOrder: w.sortOrder ?? idx,
-      })) || dashboard.widgets,
-      updatedAt: new Date().toISOString(),
-      updatedBy: 'current-user',
-    };
+      }));
+      mockWidgets[id] = updatedWidgets;
+    }
+
+    // Return full dashboard detail (using getDashboard to ensure globalFilterConfig is included)
+    return this.getDashboard(id);
   },
 
   /**
@@ -526,5 +662,21 @@ export const mockBffClient: BffClient = {
   async getTemplates(): Promise<BffDashboardTemplateListDto> {
     await new Promise((resolve) => setTimeout(resolve, 200));
     return mockTemplates;
+  },
+
+  /**
+   * Get subject selectors (for FACT data source selection)
+   */
+  async getSubjectSelectors(): Promise<BffSubjectSelectorResponse> {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    return mockSubjectSelector;
+  },
+
+  /**
+   * Get metric selectors (for METRIC data source selection)
+   */
+  async getMetricSelectors(): Promise<BffMetricSelectorResponse> {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    return mockMetricSelector;
   },
 };

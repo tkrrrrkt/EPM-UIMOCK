@@ -1,14 +1,7 @@
 'use client'
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/shared/ui'
-import { cn } from '@/lib/utils'
+import { GridComponent, ColumnsDirective, ColumnDirective, Inject, Page, Sort, Filter, PageSettingsModel } from '@syncfusion/ej2-react-grids'
+import '@syncfusion/ej2-react-grids/styles/material.css'
 import type { TableConfig } from '@epm/contracts/bff/meetings'
 
 interface TablePreviewProps {
@@ -30,79 +23,88 @@ const mockTotalData = {
   actual: 295000000,
   variance: 12000000,
   varianceRate: 4.2,
+  isTotal: true,
 }
 
 export function TablePreview({ config }: TablePreviewProps) {
+  const pageSettings: PageSettingsModel = { pageSize: 10 }
+
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('ja-JP').format(value)
+    return new Intl.NumberFormat('ja-JP', {
+      style: 'currency',
+      currency: 'JPY',
+      maximumFractionDigits: 0,
+    }).format(value)
   }
 
   const formatPercent = (value: number) => {
     return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`
   }
 
-  const getColumnHeader = (col: string) => {
-    switch (col) {
-      case 'budget':
-        return '予算'
-      case 'actual':
-        return '実績'
-      case 'variance':
-        return '差異'
-      case 'varianceRate':
-        return '差異率'
-      default:
-        return col
+  const getColumnTemplate = (col: string) => {
+    return (props: any) => {
+      const value = props[col]
+      if (col === 'varianceRate') {
+        return <span>{formatPercent(value)}</span>
+      }
+      if (col === 'variance') {
+        const isNegative = value < 0
+        return (
+          <span style={{ color: config.highlightVariance ? (isNegative ? '#dc2626' : '#059669') : 'inherit' }}>
+            {formatCurrency(value)}
+          </span>
+        )
+      }
+      return <span>{formatCurrency(value)}</span>
     }
   }
 
   const columns = config.columns || ['budget', 'actual', 'variance', 'varianceRate']
   const data = config.showTotal ? [...mockTableData, mockTotalData] : mockTableData
 
-  return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[150px]">科目</TableHead>
-            {columns.map((col) => (
-              <TableHead key={col} className="text-right">
-                {getColumnHeader(col)}
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.map((row, index) => {
-            const isTotal = row.subject === '合計'
-            return (
-              <TableRow key={index} className={cn(isTotal && 'font-medium bg-muted/50')}>
-                <TableCell className={cn(isTotal && 'font-bold')}>{row.subject}</TableCell>
-                {columns.map((col) => {
-                  const value = row[col as keyof typeof row]
-                  const isVariance = col === 'variance' || col === 'varianceRate'
-                  const isNegative = typeof value === 'number' && value < 0
+  const columnConfig = [
+    { field: 'subject', headerText: '科目', width: 150, textAlign: 'Left' as const },
+    ...columns.map((col) => ({
+      field: col,
+      headerText:
+        col === 'budget'
+          ? '予算'
+          : col === 'actual'
+            ? '実績'
+            : col === 'variance'
+              ? '差異'
+              : '差異率',
+      width: 120,
+      textAlign: 'Right' as const,
+      template: getColumnTemplate(col),
+    })),
+  ]
 
-                  return (
-                    <TableCell
-                      key={col}
-                      className={cn(
-                        'text-right font-mono',
-                        config.highlightVariance && isVariance && isNegative && 'text-red-600',
-                        config.highlightVariance && isVariance && !isNegative && typeof value === 'number' && value > 0 && 'text-emerald-600'
-                      )}
-                    >
-                      {col === 'varianceRate'
-                        ? formatPercent(value as number)
-                        : formatCurrency(value as number)}
-                    </TableCell>
-                  )
-                })}
-              </TableRow>
-            )
-          })}
-        </TableBody>
-      </Table>
+  return (
+    <div style={{ height: '400px', overflow: 'auto' }}>
+      <GridComponent
+        id="synctable-preview"
+        dataSource={data}
+        allowPaging={true}
+        allowSorting={true}
+        allowFiltering={true}
+        pageSettings={pageSettings}
+        actionFailure={() => {}}
+      >
+        <ColumnsDirective>
+          {columnConfig.map((col, idx) => (
+            <ColumnDirective
+              key={idx}
+              field={col.field}
+              headerText={col.headerText}
+              width={col.width}
+              textAlign={col.textAlign}
+              template={'template' in col ? col.template : undefined}
+            />
+          ))}
+        </ColumnsDirective>
+        <Inject services={[Page, Sort, Filter]} />
+      </GridComponent>
     </div>
   )
 }

@@ -289,7 +289,7 @@ export function CreateDashboardDialog({
             )}
           </div>
 
-          <DialogFooter className="flex space-x-2">
+          <DialogFooter>
             <Button
               type="button"
               variant="outline"
@@ -300,7 +300,6 @@ export function CreateDashboardDialog({
             </Button>
             <Button
               type="submit"
-              className="bg-primary-600 hover:bg-primary-700"
               disabled={!isValid() || creating}
             >
               {creating ? (

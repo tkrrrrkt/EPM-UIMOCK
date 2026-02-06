@@ -280,7 +280,7 @@ export function WidgetSettingsPanel({
           </Button>
           <Button
             onClick={handleSave}
-            className="flex-1 bg-primary-600 hover:bg-primary-700"
+            className="flex-1"
           >
             適用
           </Button>

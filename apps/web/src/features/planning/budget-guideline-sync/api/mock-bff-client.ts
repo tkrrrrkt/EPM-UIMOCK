@@ -26,11 +26,14 @@ import type {
 // Mock Data
 // ============================================
 const mockSubjects: BffSubjectRow[] = [
-  { id: "subj-001", subjectCode: "SALES", subjectName: "売上高", sortOrder: 1, isAggregate: false },
-  { id: "subj-002", subjectCode: "COGS", subjectName: "売上原価", sortOrder: 2, isAggregate: false },
-  { id: "subj-003", subjectCode: "GROSS", subjectName: "売上総利益", sortOrder: 3, isAggregate: true },
-  { id: "subj-004", subjectCode: "SGA", subjectName: "販管費", sortOrder: 4, isAggregate: false },
-  { id: "subj-005", subjectCode: "OP", subjectName: "営業利益", sortOrder: 5, isAggregate: true },
+  { id: "subj-001", subjectCode: "SALES", subjectName: "売上高", sortOrder: 1, isAggregate: true, parentRowId: null, indentLevel: 0, treePath: ["売上高"] },
+  { id: "subj-001-1", subjectCode: "SALES-P", subjectName: "製品売上", sortOrder: 2, isAggregate: false, parentRowId: "subj-001", indentLevel: 1, treePath: ["売上高", "製品売上"] },
+  { id: "subj-002", subjectCode: "COGS", subjectName: "売上原価", sortOrder: 3, isAggregate: true, parentRowId: null, indentLevel: 0, treePath: ["売上原価"] },
+  { id: "subj-002-1", subjectCode: "COGS-M", subjectName: "材料費", sortOrder: 4, isAggregate: false, parentRowId: "subj-002", indentLevel: 1, treePath: ["売上原価", "材料費"] },
+  { id: "subj-003", subjectCode: "GROSS", subjectName: "売上総利益", sortOrder: 5, isAggregate: true, parentRowId: null, indentLevel: 0, treePath: ["売上総利益"] },
+  { id: "subj-004", subjectCode: "SGA", subjectName: "販管費", sortOrder: 6, isAggregate: true, parentRowId: null, indentLevel: 0, treePath: ["販管費"] },
+  { id: "subj-004-1", subjectCode: "SGA-P", subjectName: "人件費", sortOrder: 7, isAggregate: false, parentRowId: "subj-004", indentLevel: 1, treePath: ["販管費", "人件費"] },
+  { id: "subj-005", subjectCode: "OP", subjectName: "営業利益", sortOrder: 8, isAggregate: true, parentRowId: null, indentLevel: 0, treePath: ["営業利益"] },
 ]
 
 const mockDimensionValues: BffDimensionValueSummary[] = [

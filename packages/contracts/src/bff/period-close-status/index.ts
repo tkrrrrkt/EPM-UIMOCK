@@ -10,16 +10,16 @@
 // Enums
 // ============================================================================
 
+// 締めステータス: 2段階のみ（仮締め廃止）
 export const CloseStatus = {
   OPEN: 'OPEN',
-  SOFT_CLOSED: 'SOFT_CLOSED',
   HARD_CLOSED: 'HARD_CLOSED',
 } as const
 
 export type CloseStatus = (typeof CloseStatus)[keyof typeof CloseStatus]
 
+// 締めアクション: 本締めと差し戻しのみ（仮締め廃止）
 export const CloseAction = {
-  SOFT_CLOSE: 'SOFT_CLOSE',
   HARD_CLOSE: 'HARD_CLOSE',
   REOPEN: 'REOPEN',
 } as const
@@ -40,10 +40,6 @@ export type CloseCheckType = (typeof CloseCheckType)[keyof typeof CloseCheckType
 export interface BffListPeriodCloseStatusRequest {
   companyId: string
   fiscalYear: number
-}
-
-export interface BffSoftCloseRequest {
-  accountingPeriodId: string
 }
 
 export interface BffHardCloseRequest {
@@ -80,6 +76,134 @@ export interface BffRunAllocationResponse {
 }
 
 // ============================================================================
+// 配賦イベント関連（Phase 2追加）
+// ============================================================================
+
+export interface BffAllocationEvent {
+  id: string
+  eventCode: string
+  eventName: string
+  scenarioType: 'ACTUAL' | 'BUDGET' | 'FORECAST'
+  executionOrder: number
+  stepCount: number
+  isActive: boolean
+}
+
+export interface BffListAllocationEventsRequest {
+  companyId: string
+  scenarioType?: 'ACTUAL' | 'BUDGET' | 'FORECAST'
+}
+
+export interface BffListAllocationEventsResponse {
+  events: BffAllocationEvent[]
+}
+
+export interface BffExecuteAllocationRequest {
+  companyId: string
+  accountingPeriodId: string
+  eventIds: string[]  // 実行するイベントID（execution_order順）
+}
+
+export interface BffAllocationEventResult {
+  eventId: string
+  eventName: string
+  status: 'SUCCESS' | 'FAILED'
+  stepCount: number
+  detailCount: number
+  totalAllocatedAmount: number
+  errorMessage?: string
+}
+
+export interface BffExecuteAllocationResponse {
+  success: boolean
+  executionIds: string[]
+  results: BffAllocationEventResult[]
+  errorMessage?: string
+}
+
+// ============================================================================
+// 配賦結果VIEW関連（Phase 2追加）
+// ============================================================================
+
+export interface BffGetAllocationResultRequest {
+  companyId: string
+  accountingPeriodId: string
+}
+
+export interface BffAllocationExecution {
+  executionId: string
+  eventId: string
+  eventName: string
+  executedAt: string
+  executedBy: string
+  status: 'SUCCESS' | 'FAILED'
+  steps: BffAllocationStepResult[]
+}
+
+export interface BffAllocationStepResult {
+  stepId: string
+  stepNo: number
+  stepName: string
+  fromSubjectCode: string
+  fromSubjectName: string
+  fromDepartmentCode: string
+  fromDepartmentName: string
+  sourceAmount: number
+  details: BffAllocationDetail[]
+}
+
+export interface BffAllocationDetail {
+  detailId: string
+  targetType: 'DEPARTMENT' | 'DIMENSION_VALUE'
+  targetCode: string
+  targetName: string
+  toSubjectCode: string
+  toSubjectName: string
+  driverType: string
+  driverValue: number | null
+  ratio: number
+  allocatedAmount: number
+}
+
+export interface BffAllocationResultResponse {
+  companyId: string
+  accountingPeriodId: string
+  periodLabel: string
+  executions: BffAllocationExecution[]
+}
+
+// AG Grid Tree Data 用のフラット化構造
+export interface BffAllocationTreeNode {
+  id: string
+  orgHierarchy: string[]  // ['イベント名', 'ステップ名', '配賦先']
+  nodeType: 'EVENT' | 'STEP' | 'DETAIL'
+  eventName?: string
+  stepName?: string
+  fromSubject?: string
+  fromDepartment?: string
+  targetName?: string
+  toSubject?: string
+  driverType?: string
+  ratio?: number
+  amount?: number
+}
+
+// ============================================================================
+// 入力ロック解除関連（Phase 2追加）
+// ============================================================================
+
+export interface BffUnlockInputRequest {
+  accountingPeriodId: string
+}
+
+export interface BffUnlockInputResponse {
+  success: boolean
+  newInputLocked: boolean
+  deletedExecutionCount: number
+  errorMessage?: string
+}
+
+// ============================================================================
 // Response DTOs
 // ============================================================================
 
@@ -94,13 +218,19 @@ export interface BffPeriodCloseStatus {
   fiscalYear: number
   periodNo: number           // 1-12
   periodLabel: string        // "4月", "5月"...
-  closeStatus: CloseStatus
-  closedAt: string | null    // ISO8601
-  operatedBy: string | null  // 操作者名
-  canSoftClose: boolean      // 仮締め可能か
-  canHardClose: boolean      // 本締め可能か
-  canReopen: boolean         // 戻し可能か（権限者のみ）
+  closeStatus: CloseStatus   // OPEN or HARD_CLOSED
+  closedAt: string | null    // ISO8601 本締め日時
+  operatedBy: string | null  // 本締め操作者名
+  canHardClose: boolean      // 本締め可能か（前月本締め済み & 配賦済み）
+  canReopen: boolean         // 差し戻し可能か（権限者のみ）
   checkResults: BffCloseCheckResult[]  // チェック結果
+  // 入力ロック・配賦処理関連
+  inputLocked: boolean       // 入力ロック状態（配賦実行で自動ON）
+  inputLockedAt: string | null  // 入力ロック日時
+  inputLockedBy: string | null  // 入力ロック操作者名
+  canUnlockInput: boolean    // 入力ロック解除可能か（OPEN状態のみ）
+  hasAllocationResult: boolean // 配賦結果があるか
+  canRunAllocation: boolean  // 配賦実行可能か
 }
 
 export interface BffListPeriodCloseStatusResponse {

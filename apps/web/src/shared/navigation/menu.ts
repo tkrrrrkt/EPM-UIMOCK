@@ -414,6 +414,13 @@ export const menu: MenuItem[] = [
         path: "/reporting/indicator-report",
         icon: LineChart,
       },
+      {
+        id: "multidim-analysis",
+        label: "Multidimensional Analysis",
+        labelJa: "BI多次元分析",
+        path: "/reporting/multidim-analysis",
+        icon: Layers,
+      },
     ],
   },
 

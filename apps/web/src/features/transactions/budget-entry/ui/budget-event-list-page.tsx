@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, MoreHorizontal, Copy, Trash2 } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Plus, MoreHorizontal, Copy, Trash2, Calculator, FileSearch } from "lucide-react"
 import {
   Button,
   Table,
@@ -31,6 +32,7 @@ import { MockBffClient } from "../api/mock-bff-client"
 import { CreateEventDialog } from "../dialogs/create-event-dialog"
 import { DuplicateEventDialog } from "../dialogs/duplicate-event-dialog"
 import { DeleteConfirmDialog } from "../dialogs/delete-confirm-dialog"
+import { BudgetAllocationDialog } from "../dialogs/budget-allocation-dialog"
 import {
   formatDateTime,
   getScenarioLabel,
@@ -42,7 +44,30 @@ import type { BffPlanEventSummary, ScenarioType } from "@epm/contracts/bff/budge
 
 const bffClient = new MockBffClient()
 
+function getAllocationStatusLabel(status: 'NOT_EXECUTED' | 'EXECUTED' | 'N/A'): string {
+  switch (status) {
+    case 'EXECUTED':
+      return '配賦済'
+    case 'NOT_EXECUTED':
+      return '未実行'
+    case 'N/A':
+      return '-'
+  }
+}
+
+function getAllocationStatusVariant(status: 'NOT_EXECUTED' | 'EXECUTED' | 'N/A'): 'default' | 'secondary' | 'outline' {
+  switch (status) {
+    case 'EXECUTED':
+      return 'default'
+    case 'NOT_EXECUTED':
+      return 'secondary'
+    case 'N/A':
+      return 'outline'
+  }
+}
+
 export function BudgetEventListPage() {
+  const router = useRouter()
   const [events, setEvents] = useState<BffPlanEventSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [scenarioFilter, setScenarioFilter] = useState<ScenarioType | "ALL">("ALL")
@@ -50,7 +75,9 @@ export function BudgetEventListPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [allocationDialogOpen, setAllocationDialogOpen] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<BffPlanEventSummary | null>(null)
+  const [allocationStatus, setAllocationStatus] = useState<{ hasAllocationResult: boolean }>({ hasAllocationResult: false })
   const { toast } = useToast()
 
   useEffect(() => {
@@ -88,6 +115,40 @@ export function BudgetEventListPage() {
   function handleDelete(event: BffPlanEventSummary) {
     setSelectedEvent(event)
     setDeleteDialogOpen(true)
+  }
+
+  async function handleAllocation(event: BffPlanEventSummary) {
+    // Only BUDGET and FORECAST can have allocation
+    if (event.scenarioType === "ACTUAL") {
+      toast({
+        title: "配賦処理",
+        description: "実績イベントの配賦は月次締処理状況から実行してください",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Only DRAFT status can run allocation (before confirmation)
+    if (event.latestVersionStatus === "FIXED") {
+      toast({
+        title: "配賦処理",
+        description: "確定済みのバージョンには配賦処理を実行できません",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSelectedEvent(event)
+
+    // Check if there's existing allocation result
+    try {
+      const status = await bffClient.getAllocationStatus(event.id)
+      setAllocationStatus(status)
+    } catch (error) {
+      setAllocationStatus({ hasAllocationResult: false })
+    }
+
+    setAllocationDialogOpen(true)
   }
 
   async function handleConfirmDelete() {
@@ -194,7 +255,10 @@ export function BudgetEventListPage() {
                     <TableHead className="text-center">年度</TableHead>
                     <TableHead className="text-center">バージョン</TableHead>
                     <TableHead className="text-center">ステータス</TableHead>
-                    <TableHead>更新日時</TableHead>
+                    <TableHead className="text-center">配賦</TableHead>
+                    <TableHead>配賦実行日</TableHead>
+                    <TableHead className="w-24 text-center">実行</TableHead>
+                    <TableHead className="w-24 text-center">結果</TableHead>
                     <TableHead className="w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -221,7 +285,16 @@ export function BudgetEventListPage() {
                           <Skeleton className="mx-auto h-6 w-16" />
                         </TableCell>
                         <TableCell>
-                          <Skeleton className="h-5 w-32" />
+                          <Skeleton className="mx-auto h-6 w-12" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-5 w-28" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="mx-auto h-8 w-16" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="mx-auto h-8 w-16" />
                         </TableCell>
                         <TableCell>
                           <Skeleton className="h-8 w-8" />
@@ -230,7 +303,7 @@ export function BudgetEventListPage() {
                     ))
                   ) : events.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                      <TableCell colSpan={11} className="h-32 text-center text-muted-foreground">
                         イベントが見つかりません
                       </TableCell>
                     </TableRow>
@@ -258,7 +331,44 @@ export function BudgetEventListPage() {
                             {getVersionStatusLabel(event.latestVersionStatus)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-muted-foreground">{formatDateTime(event.updatedAt)}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={getAllocationStatusVariant(event.allocationStatus)}>
+                            {getAllocationStatusLabel(event.allocationStatus)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {event.allocationExecutedAt ? formatDateTime(event.allocationExecutedAt) : "-"}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {event.scenarioType !== "ACTUAL" && event.latestVersionStatus !== "FIXED" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleAllocation(event)
+                              }}
+                            >
+                              <Calculator className="h-4 w-4 mr-1" />
+                              実行
+                            </Button>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {event.allocationStatus === "EXECUTED" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                router.push(`/transactions/budget-entry/${event.id}/allocation-result`)
+                              }}
+                            >
+                              <FileSearch className="h-4 w-4 mr-1" />
+                              確認
+                            </Button>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -317,6 +427,38 @@ export function BudgetEventListPage() {
             description={`「${selectedEvent.eventName}」を削除してもよろしいですか？この操作は取り消せません。`}
             onConfirm={handleConfirmDelete}
           />
+          {(selectedEvent.scenarioType === "BUDGET" || selectedEvent.scenarioType === "FORECAST") && (
+            <BudgetAllocationDialog
+              open={allocationDialogOpen}
+              onOpenChange={setAllocationDialogOpen}
+              planEventId={selectedEvent.id}
+              planEventName={selectedEvent.eventName}
+              planVersionId="pv-002" // TODO: Use actual version ID from event detail
+              planVersionName={selectedEvent.latestVersionName}
+              scenarioType={selectedEvent.scenarioType}
+              hasExistingResult={allocationStatus.hasAllocationResult}
+              onLoadEvents={async () => {
+                const response = await bffClient.listAllocationEvents(selectedEvent.id)
+                return response.events
+              }}
+              onExecute={async (eventIds) => {
+                return await bffClient.executeAllocation({
+                  planEventId: selectedEvent.id,
+                  planVersionId: "pv-002", // TODO: Use actual version ID
+                  allocationEventIds: eventIds,
+                })
+              }}
+              onSuccess={() => {
+                toast({
+                  title: "配賦処理完了",
+                  description: "配賦処理が完了しました。結果ページへ移動します。",
+                })
+                loadEvents()
+                // 結果ページへ遷移
+                router.push(`/transactions/budget-entry/${selectedEvent.id}/allocation-result`)
+              }}
+            />
+          )}
         </>
       )}
     </div>

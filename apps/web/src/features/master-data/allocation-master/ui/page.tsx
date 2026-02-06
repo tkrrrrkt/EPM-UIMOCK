@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Plus, RefreshCw } from 'lucide-react'
 import { Button, Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui'
 import type {
@@ -23,6 +24,7 @@ import {
 } from './components'
 
 export default function AllocationMasterPage() {
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -55,6 +57,15 @@ export default function AllocationMasterPage() {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
   const [driverDialogOpen, setDriverDialogOpen] = useState(false)
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null)
+
+  // Handle eventId query parameter to auto-open event detail dialog
+  useEffect(() => {
+    const eventId = searchParams.get('eventId')
+    if (eventId) {
+      setSelectedEventId(eventId)
+      setEventDetailDialogOpen(true)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     loadEvents()

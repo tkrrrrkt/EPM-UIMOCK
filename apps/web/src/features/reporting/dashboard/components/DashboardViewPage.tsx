@@ -13,10 +13,18 @@
  */
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { registerLicense } from '@syncfusion/ej2-base';
 import { Button } from '@/shared/ui';
 import { RefreshCw, Edit, ArrowLeft, Trash2 } from 'lucide-react';
+
+// Register Syncfusion license once on client load
+if (typeof window !== 'undefined') {
+  registerLicense(
+    "Ngo9BigBOggjHTQxAR8/V1JGaF5cXGpCf1FpRmJGdld5fUVHYVZUTXxaS00DNHVRdkdlWX5ceXRXRWJeVEF+W0RWYEs="
+  );
+}
 import { useDashboard } from '../hooks/useDashboard';
 import { GlobalFilterPanel } from './GlobalFilterPanel';
 import { WidgetRenderer } from './WidgetRenderer';
@@ -41,11 +49,11 @@ export function DashboardViewPage({ dashboardId, canEdit = true }: DashboardView
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // Initialize global filter from dashboard config
-  useState(() => {
+  useEffect(() => {
     if (dashboard?.globalFilterConfig) {
       setGlobalFilter(dashboard.globalFilterConfig);
     }
-  });
+  }, [dashboard]);
 
   // Handle manual refresh
   const handleRefresh = useCallback(async () => {
@@ -153,7 +161,7 @@ export function DashboardViewPage({ dashboardId, canEdit = true }: DashboardView
             targetElementId="dashboard-content"
             className="text-neutral-700"
           />
-          {canEdit && dashboard.ownerType === 'USER' && (
+          {canEdit && (
             <>
               <Button
                 variant="outline"
@@ -164,7 +172,7 @@ export function DashboardViewPage({ dashboardId, canEdit = true }: DashboardView
                 <Trash2 className="mr-2 h-4 w-4" />
                 削除
               </Button>
-              <Button onClick={handleEdit} className="bg-primary-600 hover:bg-primary-700">
+              <Button onClick={handleEdit}>
                 <Edit className="mr-2 h-4 w-4" />
                 編集
               </Button>
@@ -196,7 +204,7 @@ export function DashboardViewPage({ dashboardId, canEdit = true }: DashboardView
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-6 gap-4 auto-rows-[200px]">
+          <div className="grid grid-cols-6 gap-4 auto-rows-[280px]">
             {dashboard.widgets.map((widget) => (
               <div
                 key={widget.id}

@@ -49,6 +49,8 @@ import type {
   BffDashboardSelectorsRequestDto,
   BffDashboardSelectorsResponseDto,
   BffKpiDefinitionOptionListDto,
+  BffSubjectSelectorResponse,
+  BffMetricSelectorResponse,
 } from '@epm/contracts/bff/dashboard';
 
 /** Query DTO for dashboard list */
@@ -60,7 +62,7 @@ interface GetDashboardsQueryDto {
   keyword?: string;
 }
 
-@Controller('bff/reporting/dashboards')
+@Controller('reporting/dashboards')
 export class DashboardBffController {
   constructor(private readonly service: DashboardBffService) {}
 
@@ -151,6 +153,36 @@ export class DashboardBffController {
     this.validateTenantId(tenantId);
     this.validateCompanyId(companyId);
     return this.service.getKpiDefinitions(tenantId, companyId);
+  }
+
+  /**
+   * GET /api/bff/reporting/dashboards/selectors/subjects
+   * 科目（FACT）選択肢取得
+   * NOTE: This route must be before :id to avoid conflicts
+   */
+  @Get('selectors/subjects')
+  async getSubjectSelectors(
+    @Headers('x-tenant-id') tenantId: string,
+    @Headers('x-company-id') companyId: string,
+  ) {
+    this.validateTenantId(tenantId);
+    this.validateCompanyId(companyId);
+    return this.service.getSubjectSelectors(tenantId, companyId);
+  }
+
+  /**
+   * GET /api/bff/reporting/dashboards/selectors/metrics
+   * 指標（METRIC）選択肢取得
+   * NOTE: This route must be before :id to avoid conflicts
+   */
+  @Get('selectors/metrics')
+  async getMetricSelectors(
+    @Headers('x-tenant-id') tenantId: string,
+    @Headers('x-company-id') companyId: string,
+  ) {
+    this.validateTenantId(tenantId);
+    this.validateCompanyId(companyId);
+    return this.service.getMetricSelectors(tenantId, companyId);
   }
 
   /**

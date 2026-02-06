@@ -104,7 +104,7 @@ export function DashboardListPage() {
             経営指標を可視化するダッシュボードを管理します
           </p>
         </div>
-        <Button onClick={handleCreate} className="bg-primary-600 hover:bg-primary-700">
+        <Button onClick={handleCreate}>
           <Plus className="mr-2 h-4 w-4" />
           新規作成
         </Button>

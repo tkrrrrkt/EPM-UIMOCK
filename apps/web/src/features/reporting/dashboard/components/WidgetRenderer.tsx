@@ -49,17 +49,23 @@ export function WidgetRenderer({ widget, dashboardId, globalFilter }: WidgetRend
 
   // Resolve filter: widget filter overrides global filter
   const resolveFilter = useCallback((): BffWidgetDataRequestDto | null => {
-    if (!globalFilter) return null;
-
-    const effectiveFilter = widget.filterConfig.useGlobal
-      ? globalFilter
-      : { ...globalFilter, ...widget.filterConfig.overrides };
+    // Use global filter if available, otherwise use default values
+    const effectiveFilter = globalFilter || {
+      fiscalYear: new Date().getFullYear(),
+      departmentStableId: 'dept-all',
+      includeChildren: true,
+      periodStart: `${new Date().getFullYear()}01`,
+      periodEnd: `${new Date().getFullYear()}12`,
+      displayGranularity: 'MONTHLY' as const,
+      primary: { scenarioType: 'ACTUAL' as const },
+      compare: { enabled: false },
+    };
 
     return {
       resolvedFilter: {
         fiscalYear: effectiveFilter.fiscalYear || new Date().getFullYear(),
-        departmentStableId: effectiveFilter.departmentStableId || '',
-        includeChildren: effectiveFilter.includeChildren || false,
+        departmentStableId: effectiveFilter.departmentStableId || 'dept-all',
+        includeChildren: effectiveFilter.includeChildren ?? true,
         periodStart: effectiveFilter.periodStart || `${new Date().getFullYear()}01`,
         periodEnd: effectiveFilter.periodEnd || `${new Date().getFullYear()}12`,
         displayGranularity: effectiveFilter.displayGranularity || 'MONTHLY',

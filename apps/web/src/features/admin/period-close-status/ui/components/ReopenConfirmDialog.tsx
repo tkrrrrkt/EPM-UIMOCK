@@ -48,11 +48,11 @@ export function ReopenConfirmDialog({
     <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>仮締め解除の確認</AlertDialogTitle>
+          <AlertDialogTitle>差し戻しの確認</AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-4">
               <p>
-                <span className="font-medium">{periodLabel}</span>の仮締めを解除して未締めに戻します。
+                <span className="font-medium">{periodLabel}</span>の本締めを解除して未締めに戻します。
               </p>
               <div className="space-y-2">
                 <Label htmlFor="notes">理由（任意）</Label>

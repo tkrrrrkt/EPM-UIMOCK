@@ -365,6 +365,34 @@ export interface BffKpiDefinitionOptionListDto {
   items: BffKpiDefinitionOption[];
 }
 
+/** 科目（財務）選択肢 */
+export interface BffSubjectSelectorOption {
+  stableId: string;
+  subjectCode: string;
+  subjectName: string;
+  parentStableId: string | null;
+  level: number;
+}
+
+/** 科目選択肢レスポンスDTO */
+export interface BffSubjectSelectorResponse {
+  items: BffSubjectSelectorOption[];
+}
+
+/** 指標（メトリクス）選択肢 */
+export interface BffMetricSelectorOption {
+  id: string;
+  metricCode: string;
+  metricName: string;
+  metricType: 'FIN_METRIC' | 'KPI_METRIC';
+  unit: string | null;
+}
+
+/** 指標選択肢レスポンスDTO */
+export interface BffMetricSelectorResponse {
+  items: BffMetricSelectorOption[];
+}
+
 // ============================================================
 // Error Codes
 // ============================================================

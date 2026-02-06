@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import dynamic from "next/dynamic"
 import {
   ArrowLeft,
   CheckCircle2,
@@ -11,6 +10,7 @@ import {
   GitCompare,
   PlayCircle,
   RotateCcw,
+  Settings2,
 } from "lucide-react"
 
 import { Button } from "@/shared/ui/components/button"
@@ -27,14 +27,34 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/shared/ui/components/alert-dialog"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/shared/ui/components/sheet"
 
 import type { BffClient } from "../api/BffClient"
 import type {
   ImportType,
   BffStagingRow,
   BffStagingColumn,
+  BffColumnMapping,
+  BffCodeMapping,
+  BffSubjectForMapping,
+  BffDepartmentForMapping,
+  BffTemplate,
+  BffValidationError,
 } from "@epm/contracts/bff/data-import"
+import { LARGE_DATA_THRESHOLD } from "@epm/contracts/bff/data-import"
 import { getErrorMessage } from "../error-messages"
+
+import { ImportPreviewGrid } from "./ImportPreviewGrid"
+import { LargeDataWarningDialog } from "./LargeDataWarningDialog"
+import { MappingPanel } from "./MappingPanel"
+import { ValidationSummary } from "./ValidationSummary"
 
 interface StagingSummary {
   totalRows: number
@@ -44,19 +64,6 @@ interface StagingSummary {
   errorRows?: number
   warningRows?: number
 }
-
-// SpreadJSはSSR非対応なのでdynamic import
-const StagingGrid = dynamic(
-  () => import("./StagingGrid").then(mod => ({ default: mod.StagingGrid })),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center h-96 bg-muted/30 rounded-md">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    ),
-  }
-)
 
 interface StagingSectionProps {
   bffClient: BffClient
@@ -68,35 +75,70 @@ interface StagingSectionProps {
   onComplete: () => void
 }
 
+// ステージングのサブステップ
+type StagingSubStep = "large-data-warning" | "mapping" | "preview" | "complete"
+
 interface StagingState {
+  subStep: StagingSubStep
   columns: BffStagingColumn[]
   rows: BffStagingRow[]
   summary: StagingSummary | null
   isLoading: boolean
   isValidating: boolean
   isExecuting: boolean
+  isAggregating: boolean
   error: string | null
-  validationResult: "VALID" | "INVALID" | null
+  validationResult: "VALID" | "HAS_ERRORS" | "HAS_WARNINGS" | null
+  validationErrors: BffValidationError[]
   showExecuteDialog: boolean
+  showMappingSheet: boolean
   executeResult: {
     status: "COMPLETED" | "FAILED"
     importedRows: number
     excludedRows: number
     message: string
   } | null
+  // 大量データ検出
+  detectedRowCount: number | null
+  needsAggregation: boolean
+  // マッピング関連
+  columnMappings: BffColumnMapping[]
+  subjectCodes: BffCodeMapping[]
+  departmentCodes: BffCodeMapping[]
+  templates: BffTemplate[]
+  subjects: BffSubjectForMapping[]
+  departments: BffDepartmentForMapping[]
+  selectedTemplateCode: string | null
+  saveMapping: boolean
+  saveMappingName: string
 }
 
 const initialState: StagingState = {
+  subStep: "preview",
   columns: [],
   rows: [],
   summary: null,
   isLoading: true,
   isValidating: false,
   isExecuting: false,
+  isAggregating: false,
   error: null,
   validationResult: null,
+  validationErrors: [],
   showExecuteDialog: false,
+  showMappingSheet: false,
   executeResult: null,
+  detectedRowCount: null,
+  needsAggregation: false,
+  columnMappings: [],
+  subjectCodes: [],
+  departmentCodes: [],
+  templates: [],
+  subjects: [],
+  departments: [],
+  selectedTemplateCode: null,
+  saveMapping: false,
+  saveMappingName: "",
 }
 
 export function StagingSection({
@@ -130,6 +172,30 @@ export function StagingSection({
           isLoading: false,
           error: getErrorMessage(err),
         }))
+      })
+  }, [bffClient, batchId])
+
+  // マッピングデータとマスタデータの取得
+  React.useEffect(() => {
+    // 並行して取得
+    Promise.all([
+      bffClient.getPreMapping({ batchId }),
+      bffClient.getMappingMaster(),
+      bffClient.getTemplates({ includeSystem: true }),
+    ])
+      .then(([preMapping, masterData, templatesRes]) => {
+        setState(prev => ({
+          ...prev,
+          columnMappings: preMapping.columnMappings,
+          subjectCodes: preMapping.subjectCodes,
+          departmentCodes: preMapping.departmentCodes,
+          subjects: masterData.subjects,
+          departments: masterData.departments,
+          templates: templatesRes.templates,
+        }))
+      })
+      .catch(err => {
+        console.error("Failed to load mapping data:", err)
       })
   }, [bffClient, batchId])
 
@@ -188,6 +254,14 @@ export function StagingSection({
     }
   }, [bffClient, batchId])
 
+  // 行へのジャンプ処理（ValidationSummaryから呼ばれる）
+  // NOTE: Hooksは条件付きreturnの前に配置する必要がある
+  const handleJumpToRow = React.useCallback((rowIndex: number) => {
+    // AG-GridへのスクロールはgridのensureIndexVisibleを呼ぶ必要があるが
+    // 現在のコンポーネント構造ではrefを渡していないため、将来の拡張として残す
+    console.log("[handleJumpToRow] Jump to row:", rowIndex)
+  }, [])
+
   // 検証実行
   const handleValidate = async () => {
     console.log("[handleValidate] Start validation for batchId:", batchId)
@@ -196,14 +270,23 @@ export function StagingSection({
       console.log("[handleValidate] Calling bffClient.validate...")
       const result = await bffClient.validate({ batchId })
       console.log("[handleValidate] Validation result:", result)
+
+      // Map API status to UI status
+      const mappedStatus = result.status === "VALID"
+        ? "VALID" as const
+        : result.summary.errorRows > 0
+          ? "HAS_ERRORS" as const
+          : "HAS_WARNINGS" as const
+
       setState(prev => ({
         ...prev,
         isValidating: false,
-        validationResult: result.status === "VALID" ? "VALID" : "INVALID",
+        validationResult: mappedStatus,
+        validationErrors: result.errors,
         rows: prev.rows.map(row => {
           const error = result.errors.find(e => e.rowIndex === row.rowIndex)
           if (error) {
-            return { ...row, validationStatus: "ERROR" as const }
+            return { ...row, validationStatus: error.severity === "ERROR" ? "ERROR" as const : "WARNING" as const }
           }
           return { ...row, validationStatus: "OK" as const }
         }),
@@ -369,7 +452,7 @@ export function StagingSection({
   }
 
   const excludedCount = state.summary?.excludedRows ?? 0
-  const canExecute = state.validationResult === "VALID"
+  const canExecute = state.validationResult === "VALID" || state.validationResult === "HAS_WARNINGS"
 
   return (
     <div className="flex flex-col h-full space-y-4">
@@ -388,6 +471,82 @@ export function StagingSection({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* マッピング設定シート */}
+          <Sheet
+            open={state.showMappingSheet}
+            onOpenChange={(open) => setState(prev => ({ ...prev, showMappingSheet: open }))}
+          >
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Settings2 className="h-4 w-4 mr-1" />
+                マッピング設定
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="sm:max-w-3xl w-[800px] overflow-y-auto">
+              <SheetHeader>
+                <SheetTitle>カラムマッピング設定</SheetTitle>
+                <SheetDescription>
+                  取込ファイルの列とシステム項目のマッピングを確認・変更できます
+                </SheetDescription>
+              </SheetHeader>
+              <div className="mt-6">
+                <MappingPanel
+                  columnMappings={state.columnMappings}
+                  subjectCodes={state.subjectCodes}
+                  departmentCodes={state.departmentCodes}
+                  templates={state.templates}
+                  subjects={state.subjects}
+                  departments={state.departments}
+                  selectedTemplateCode={state.selectedTemplateCode ?? undefined}
+                  saveMapping={state.saveMapping}
+                  saveMappingName={state.saveMappingName}
+                  onColumnMappingChange={(idx, target) => {
+                    setState(prev => ({
+                      ...prev,
+                      columnMappings: prev.columnMappings.map((m, i) =>
+                        i === idx ? { ...m, mappingTarget: target } : m
+                      ),
+                    }))
+                  }}
+                  onCodeMappingChange={(type, sourceValue, targetId) => {
+                    if (type === "subject") {
+                      setState(prev => ({
+                        ...prev,
+                        subjectCodes: prev.subjectCodes.map(c =>
+                          c.sourceValue === sourceValue
+                            ? { ...c, targetId, status: targetId ? "MAPPED" : "UNMAPPED" }
+                            : c
+                        ),
+                      }))
+                    } else {
+                      setState(prev => ({
+                        ...prev,
+                        departmentCodes: prev.departmentCodes.map(c =>
+                          c.sourceValue === sourceValue
+                            ? { ...c, targetId, status: targetId ? "MAPPED" : "UNMAPPED" }
+                            : c
+                        ),
+                      }))
+                    }
+                  }}
+                  onTemplateSelect={(code) => {
+                    setState(prev => ({ ...prev, selectedTemplateCode: code ?? null }))
+                  }}
+                  onSaveMappingChange={(save) => {
+                    setState(prev => ({ ...prev, saveMapping: save }))
+                  }}
+                  onSaveMappingNameChange={(name) => {
+                    setState(prev => ({ ...prev, saveMappingName: name }))
+                  }}
+                  onApply={async () => {
+                    setState(prev => ({ ...prev, showMappingSheet: false }))
+                  }}
+                  isApplying={false}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
+
           {excludedCount > 0 && (
             <Button variant="ghost" size="sm" onClick={handleRestoreAll}>
               <RotateCcw className="h-4 w-4 mr-1" />
@@ -427,6 +586,11 @@ export function StagingSection({
                   <CheckCircle2 className="h-3 w-3 mr-1" />
                   検証OK
                 </Badge>
+              ) : state.validationResult === "HAS_WARNINGS" ? (
+                <Badge variant="outline" className="border-amber-300 text-amber-600">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  警告あり
+                </Badge>
               ) : (
                 <Badge variant="destructive">
                   <AlertTriangle className="h-3 w-3 mr-1" />
@@ -438,6 +602,22 @@ export function StagingSection({
         )}
       </div>
 
+      {/* Validation Summary（検証結果がある場合のみ表示） */}
+      {state.validationResult && state.summary && (
+        <ValidationSummary
+          status={state.validationResult}
+          summary={{
+            totalRows: state.summary.totalRows,
+            validRows: state.summary.validRows ?? 0,
+            errorRows: state.summary.errorRows ?? 0,
+            warningRows: state.summary.warningRows ?? 0,
+            excludedRows: state.summary.excludedRows,
+          }}
+          errors={state.validationErrors}
+          onJumpToRow={handleJumpToRow}
+        />
+      )}
+
       {/* Error Display */}
       {state.error && (
         <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
@@ -445,14 +625,14 @@ export function StagingSection({
         </div>
       )}
 
-      {/* Grid */}
-      <div className="border rounded-lg overflow-hidden" style={{ height: "500px" }}>
-        <StagingGrid
+      {/* Grid - AG-Grid ベースの ImportPreviewGrid を使用 */}
+      <div className="border rounded-lg overflow-hidden">
+        <ImportPreviewGrid
           columns={state.columns}
           rows={state.rows}
           onRowExcludedChange={handleRowExcludedChange}
           onCellChange={handleCellChange}
-          className="h-full"
+          height={450}
         />
       </div>
 

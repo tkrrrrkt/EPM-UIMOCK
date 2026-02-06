@@ -40,6 +40,18 @@ export class DashboardApiError extends Error {
 }
 
 /**
+ * Get default headers with tenant/user/company context
+ */
+function getDefaultHeaders(): HeadersInit {
+  return {
+    'Content-Type': 'application/json',
+    'x-tenant-id': '11111111-1111-1111-1111-111111111111',
+    'x-user-id': '22222222-2222-2222-2222-222222222222',
+    'x-company-id': '33333333-3333-3333-3333-333333333333',
+  }
+}
+
+/**
  * HTTP request helper with error handling
  */
 async function fetchJson<T>(
@@ -50,7 +62,7 @@ async function fetchJson<T>(
     const response = await fetch(url, {
       ...options,
       headers: {
-        'Content-Type': 'application/json',
+        ...getDefaultHeaders(),
         ...options?.headers,
       },
     });
@@ -213,6 +225,20 @@ export function createHttpBffClient(baseUrl = '/api/bff/reporting/dashboards'): 
      */
     async getTemplates(): Promise<BffDashboardTemplateListDto> {
       return fetchJson<BffDashboardTemplateListDto>(`${baseUrl}/templates`);
+    },
+
+    /**
+     * Get subject (FACT) selectors
+     */
+    async getSubjectSelectors() {
+      return fetchJson(`${baseUrl}/selectors/subjects`);
+    },
+
+    /**
+     * Get metric selectors
+     */
+    async getMetricSelectors() {
+      return fetchJson(`${baseUrl}/selectors/metrics`);
     },
   };
 }

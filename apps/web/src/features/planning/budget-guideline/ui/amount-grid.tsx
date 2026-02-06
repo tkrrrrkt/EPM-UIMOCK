@@ -1,15 +1,15 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect, useRef } from "react"
-import { Card, Input } from "@/shared/ui"
+import { useMemo, useCallback, useState } from "react"
+import type { ColDef } from "ag-grid-community"
+import { Card } from "@/shared/ui"
+import { EditableAmountGrid, type GuidelineAmountRowData, type PendingChange, amountValueFormatter, amountValueParser } from "@/shared/ag-grid"
 import type {
   BffSubjectRow,
   BffPeriodColumn,
   BffGuidelineAmountCell,
   BffActualCell,
 } from "@epm/contracts/bff/budget-guideline"
-import { cn } from "@/lib/utils"
 
 interface AmountGridProps {
   subjects: BffSubjectRow[]
@@ -21,6 +21,16 @@ interface AmountGridProps {
   onAmountChange: (subjectId: string, periodKey: string, amount: string) => void
 }
 
+/**
+ * 予算ガイドライン 数値入力グリッド（AG-Grid版）
+ *
+ * 機能:
+ * - Excelライクなコピー＆ペースト
+ * - 範囲選択
+ * - キーボードナビゲーション（Tab, Enter, 矢印キー）
+ * - 実績列（過去5年）は読み取り専用
+ * - ガイドライン列は編集可能（集計行除く）
+ */
 export function AmountGrid({
   subjects,
   guidelinePeriods,
@@ -30,131 +40,132 @@ export function AmountGrid({
   isReadOnly,
   onAmountChange,
 }: AmountGridProps) {
-  const [editingCell, setEditingCell] = useState<{ subjectId: string; periodKey: string } | null>(null)
-  const [editValue, setEditValue] = useState("")
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [localAmounts, setLocalAmounts] = useState<Map<string, string>>(() => {
+    const map = new Map<string, string>()
+    guidelineAmounts.forEach((cell) => {
+      const key = `${cell.subjectId}-${cell.periodKey}`
+      map.set(key, cell.amount)
+    })
+    return map
+  })
 
-  useEffect(() => {
-    if (editingCell && inputRef.current) {
-      inputRef.current.focus()
-      inputRef.current.select()
-    }
-  }, [editingCell])
+  // ツリーパス取得コールバック
+  const getDataPath = useCallback((row: GuidelineAmountRowData) => {
+    return row.treePath || [row.subjectName]
+  }, [])
 
-  const getActualAmount = (subjectId: string, fiscalYear: number): string => {
-    const cell = actualsAmounts.find((a) => a.subjectId === subjectId && a.fiscalYear === fiscalYear)
-    return cell ? formatAmount(cell.amount) : "-"
-  }
+  // APIレスポンスをAG-Grid用の行データに変換
+  const rowData = useMemo<GuidelineAmountRowData[]>(() => {
+    return subjects.map((subject) => {
+      const row: GuidelineAmountRowData = {
+        id: subject.id,
+        subjectCode: subject.subjectCode,
+        subjectName: subject.subjectName,
+        isAggregate: subject.isAggregate,
+        indentLevel: subject.indentLevel,
+        treePath: subject.treePath,
+      }
 
-  const getGuidelineAmount = (subjectId: string, periodKey: string): string => {
-    const cell = guidelineAmounts.find((a) => a.subjectId === subjectId && a.periodKey === periodKey)
-    return cell ? cell.amount : ""
-  }
+      // 実績年度の金額を追加
+      actualsYears.forEach((year) => {
+        const fieldName = `actual_${year}`
+        const amount = actualsAmounts.find(
+          (a) => a.subjectId === subject.id && a.fiscalYear === year
+        )
+        row[fieldName] = parseFloat(amount?.amount || "0")
+      })
 
-  const formatAmount = (amount: string): string => {
-    if (!amount || amount === "0") return "-"
-    const num = Number(amount)
-    return num.toLocaleString("ja-JP")
-  }
+      // ガイドライン期間の金額を追加
+      guidelinePeriods.forEach((period) => {
+        const fieldName = `gl_${period.key}`
+        const key = `${subject.id}-${period.key}`
+        const amount = localAmounts.get(key) || "0"
+        row[fieldName] = parseFloat(amount)
+      })
 
-  const handleCellClick = (subjectId: string, periodKey: string, isAggregate: boolean) => {
-    if (isReadOnly || isAggregate) return
+      return row
+    })
+  }, [subjects, actualsYears, actualsAmounts, guidelinePeriods, localAmounts])
 
-    const currentAmount = getGuidelineAmount(subjectId, periodKey)
-    setEditingCell({ subjectId, periodKey })
-    setEditValue(currentAmount)
-  }
+  // 列定義（科目名列はautoGroupColumnDefで自動生成）
+  const columnDefs = useMemo<ColDef<GuidelineAmountRowData>[]>(() => {
+    const cols: ColDef<GuidelineAmountRowData>[] = []
 
-  const handleSave = () => {
-    if (editingCell) {
-      onAmountChange(editingCell.subjectId, editingCell.periodKey, editValue)
-      setEditingCell(null)
-    }
-  }
+    // 実績年度列を追加
+    actualsYears.forEach((year) => {
+      cols.push({
+        field: `actual_${year}`,
+        headerName: `FY${year}\n実績`,
+        width: 100,
+        editable: false,
+        valueFormatter: amountValueFormatter,
+        cellStyle: {
+          textAlign: "right",
+          backgroundColor: "hsl(var(--muted) / 0.3)",
+          color: "hsl(var(--muted-foreground))",
+        },
+        cellClass: "tabular-nums",
+      })
+    })
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSave()
-    } else if (e.key === "Escape") {
-      setEditingCell(null)
-    }
-  }
+    // ガイドライン期間列を追加
+    guidelinePeriods.forEach((period) => {
+      cols.push({
+        field: `gl_${period.key}`,
+        headerName: `${period.label}\nGL`,
+        width: 120,
+        editable: (params) => {
+          if (isReadOnly) return false
+          if (params.data?.isAggregate) return false
+          return true
+        },
+        valueFormatter: amountValueFormatter,
+        valueParser: amountValueParser,
+        cellStyle: { textAlign: "right" },
+        cellClass: (params) => {
+          const classes: string[] = ["tabular-nums"]
+          if (params.data?.isAggregate) classes.push("font-semibold")
+          return classes.join(" ")
+        },
+      })
+    })
+
+    return cols
+  }, [actualsYears, guidelinePeriods, isReadOnly])
+
+  // セル値変更時の処理
+  const handleCellValueChanged = useCallback(
+    (change: PendingChange) => {
+      // フィールド名から periodKey を抽出（gl_xxx → xxx）
+      const periodKey = change.field.replace(/^gl_/, "")
+      const key = `${change.rowId}-${periodKey}`
+
+      // ローカル状態を更新
+      setLocalAmounts((prev) => {
+        const updated = new Map(prev)
+        updated.set(key, change.newValue)
+        return updated
+      })
+
+      // 親に通知
+      onAmountChange(change.rowId, periodKey, change.newValue)
+    },
+    [onAmountChange]
+  )
 
   return (
-    <Card className="overflow-auto">
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b bg-muted/50">
-            <th className="sticky left-0 z-20 min-w-[180px] border-r bg-muted/50 p-3 text-left font-medium">科目</th>
-            {actualsYears.map((year) => (
-              <th key={year} className="min-w-[120px] border-r bg-muted/50 p-3 text-right font-medium">
-                FY{year}
-                <div className="text-xs font-normal text-muted-foreground">(実績)</div>
-              </th>
-            ))}
-            {guidelinePeriods.map((period) => (
-              <th key={period.key} className="min-w-[120px] border-r bg-background p-3 text-right font-medium">
-                {period.label}
-                <div className="text-xs font-normal text-muted-foreground">(ガイドライン)</div>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {subjects.map((subject) => (
-            <tr key={subject.id} className={cn("border-b hover:bg-muted/30", subject.isAggregate && "bg-muted/20")}>
-              <td
-                className={cn(
-                  "sticky left-0 z-10 border-r bg-background p-3 font-medium",
-                  subject.isAggregate && "bg-muted/20 font-semibold",
-                )}
-              >
-                {subject.subjectName}
-              </td>
-
-              {/* Actual columns */}
-              {actualsYears.map((year) => (
-                <td key={year} className="border-r bg-muted/10 p-3 text-right tabular-nums text-muted-foreground">
-                  {getActualAmount(subject.id, year)}
-                </td>
-              ))}
-
-              {/* Guideline columns */}
-              {guidelinePeriods.map((period) => {
-                const isEditing = editingCell?.subjectId === subject.id && editingCell?.periodKey === period.key
-                const amount = getGuidelineAmount(subject.id, period.key)
-                const canEdit = !isReadOnly && !subject.isAggregate
-
-                return (
-                  <td
-                    key={period.key}
-                    className={cn(
-                      "border-r p-3 text-right tabular-nums",
-                      canEdit && "cursor-pointer hover:bg-primary/5",
-                      subject.isAggregate && "bg-muted/20 font-semibold",
-                    )}
-                    onClick={() => handleCellClick(subject.id, period.key, subject.isAggregate)}
-                  >
-                    {isEditing ? (
-                      <Input
-                        ref={inputRef}
-                        type="text"
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onBlur={handleSave}
-                        onKeyDown={handleKeyDown}
-                        className="h-8 w-full text-right"
-                      />
-                    ) : (
-                      formatAmount(amount)
-                    )}
-                  </td>
-                )
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <Card className="overflow-hidden">
+      <EditableAmountGrid<GuidelineAmountRowData>
+        rowData={rowData}
+        columnDefs={columnDefs}
+        isReadOnly={isReadOnly}
+        height={Math.min(500, 80 + subjects.length * 36)}
+        onCellValueChanged={handleCellValueChanged}
+        getRowId={(data) => data.id}
+        treeData={true}
+        getDataPath={getDataPath}
+        groupDefaultExpanded={1}
+      />
     </Card>
   )
 }

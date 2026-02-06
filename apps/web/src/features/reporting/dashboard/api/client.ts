@@ -8,11 +8,11 @@
  *
  * Reference: .kiro/specs/reporting/dashboard/design.md
  */
-// import { mockBffClient } from './MockBffClient';
-import { createHttpBffClient } from './HttpBffClient';
+import { mockBffClient } from './MockBffClient';
+// import { createHttpBffClient } from './HttpBffClient';
 
 // Phase UI-MOCK: Use mock client
-// export const bffClient = mockBffClient;
+export const bffClient = mockBffClient;
 
 // Phase UI-BFF: Use real HTTP client
-export const bffClient = createHttpBffClient();
+// export const bffClient = createHttpBffClient();

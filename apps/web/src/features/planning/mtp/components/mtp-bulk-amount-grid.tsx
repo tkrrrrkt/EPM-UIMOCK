@@ -1,7 +1,7 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
+import type { ColDef, ValueGetterParams } from "ag-grid-community"
 import {
   Card,
   CardContent,
@@ -12,14 +12,13 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/shared/ui"
+import { EditableAmountGrid, type MtpAmountRowData, type PendingChange, amountValueFormatter, amountValueParser } from "@/shared/ag-grid"
 import type {
   BffSubjectRow,
   BffAmountColumn,
   BffMtpAmountCell,
   BffDimensionValueSummary,
 } from "@epm/contracts/bff/mtp"
-import { formatAmount, parseAmount } from "../utils/format"
-import { cn } from "@/lib/utils"
 
 interface BulkMtpAmountData {
   dimensionValueId: string
@@ -35,15 +34,17 @@ interface MtpBulkAmountGridProps {
   onAmountChange: (dimensionValueId: string, subjectId: string, fiscalYear: number, amount: string) => void
 }
 
+/**
+ * MTP 一括入力グリッド（AG-Grid版）
+ *
+ * 機能:
+ * - 全社合計: 読み取り専用、フロント側でリアルタイム自動集計
+ * - 各事業部: アコーディオン内にAG-Gridインスタンス配置
+ * - Excelライクなコピー＆ペースト
+ * - 範囲選択
+ */
 export function MtpBulkAmountGrid({ dimensionValues, bulkData, onAmountChange }: MtpBulkAmountGridProps) {
-  const [editingCell, setEditingCell] = useState<{
-    dimensionValueId: string
-    subjectId: string
-    fiscalYear: number
-  } | null>(null)
-  const [editValue, setEditValue] = useState("")
   const [localAmounts, setLocalAmounts] = useState<Map<string, string>>(new Map())
-  const inputRef = useRef<HTMLInputElement>(null)
 
   // 初期データをローカルステートに設定
   useEffect(() => {
@@ -57,29 +58,30 @@ export function MtpBulkAmountGrid({ dimensionValues, bulkData, onAmountChange }:
     setLocalAmounts(amountMap)
   }, [bulkData])
 
-  useEffect(() => {
-    if (editingCell && inputRef.current) {
-      inputRef.current.focus()
-      inputRef.current.select()
-    }
-  }, [editingCell])
-
   // 全社分を最初に取得（サンプルとして科目・列情報を得る）
   const totalData = bulkData.find((d) => d.dimensionValueId === "dv-all")
   const sampleData = totalData || bulkData[0]
+
   if (!sampleData) return null
 
   const subjects = sampleData.subjects
   const columns = sampleData.columns
 
-  const getLocalAmount = (dimensionValueId: string, subjectId: string, fiscalYear: number): string => {
-    const key = `${dimensionValueId}-${subjectId}-${fiscalYear}`
-    return localAmounts.get(key) || "0"
-  }
+  // 計画列のフィールド名リスト
+  const planFields = useMemo(() => {
+    return columns.filter((c) => !c.isActual).map((c) => `plan_${c.fiscalYear}`)
+  }, [columns])
 
-  // フロントエンド側での全社集計計算（計画列のみ）
+  // ディメンション値を並び替え（全社が最初）
+  const sortedDimensionValues = useMemo(() => {
+    const totalDv = dimensionValues.find((dv) => dv.valueCode === "ALL")
+    const otherDvs = dimensionValues.filter((dv) => dv.valueCode !== "ALL")
+    return totalDv ? [totalDv, ...otherDvs] : otherDvs
+  }, [dimensionValues])
+
+  // フロントエンド側での全社集計計算
   const calculateTotalAmount = useCallback(
-    (subjectId: string, fiscalYear: number): string => {
+    (subjectId: string, fiscalYear: number): number => {
       let total = 0
       bulkData
         .filter((d) => d.dimensionValueId !== "dv-all")
@@ -90,159 +92,160 @@ export function MtpBulkAmountGrid({ dimensionValues, bulkData, onAmountChange }:
             total += Number(amount) || 0
           }
         })
-      return String(total)
+      return total
     },
-    [bulkData, localAmounts],
+    [bulkData, localAmounts]
   )
 
-  const handleCellClick = (
-    dimensionValueId: string,
-    subjectId: string,
-    fiscalYear: number,
-    isActual: boolean,
-    isAggregate: boolean,
-  ) => {
-    const data = bulkData.find((d) => d.dimensionValueId === dimensionValueId)
-    if (!data || data.isReadOnly || isAggregate || isActual) return
-    // 全社合計は編集不可
-    if (dimensionValueId === "dv-all") return
+  // ツリーパス取得コールバック
+  const getDataPath = useCallback((row: MtpAmountRowData) => {
+    return row.treePath || [row.subjectName]
+  }, [])
 
-    const currentAmount = getLocalAmount(dimensionValueId, subjectId, fiscalYear)
-    setEditingCell({ dimensionValueId, subjectId, fiscalYear })
-    setEditValue(formatAmount(currentAmount))
-  }
+  // 列定義生成（科目名列はautoGroupColumnDefで自動生成）
+  const createColumnDefs = useCallback(
+    (isTotal: boolean, isReadOnly: boolean): ColDef<MtpAmountRowData>[] => {
+      const cols: ColDef<MtpAmountRowData>[] = []
 
-  const handleSave = () => {
-    if (editingCell) {
-      const parsedAmount = parseAmount(editValue)
+      // 年度列を追加
+      columns.forEach((col) => {
+        const fieldName = col.isActual ? `actual_${col.fiscalYear}` : `plan_${col.fiscalYear}`
+        const canEdit = !isTotal && !col.isActual && !isReadOnly
 
-      // ローカルステートを更新
-      const key = `${editingCell.dimensionValueId}-${editingCell.subjectId}-${editingCell.fiscalYear}`
+        cols.push({
+          field: fieldName,
+          headerName: `FY${col.fiscalYear}\n${col.isActual ? "実績" : "計画"}`,
+          width: 100,
+          editable: (params) => {
+            if (!canEdit) return false
+            if (params.data?.isAggregate) return false
+            return true
+          },
+          valueFormatter: amountValueFormatter,
+          valueParser: amountValueParser,
+          cellStyle: (params) => {
+            const style: Record<string, string> = { textAlign: "right" }
+            if (col.isActual) {
+              style.backgroundColor = "hsl(var(--muted) / 0.3)"
+              style.color = "hsl(var(--muted-foreground))"
+            }
+            if (isTotal && !col.isActual) {
+              style.backgroundColor = "hsl(var(--primary) / 0.05)"
+              style.fontWeight = "600"
+            }
+            return style
+          },
+          cellClass: (params) => {
+            const classes: string[] = ["tabular-nums"]
+            if (params.data?.isAggregate) classes.push("font-semibold")
+            return classes.join(" ")
+          },
+        })
+      })
+
+      // 計画合計列
+      cols.push({
+        headerName: "計画合計",
+        width: 100,
+        editable: false,
+        valueGetter: (params: ValueGetterParams<MtpAmountRowData>) => {
+          if (!params.data) return 0
+          return planFields.reduce((sum, field) => {
+            const value = params.data?.[field]
+            if (value === null || value === undefined) return sum
+            const num = typeof value === "string" ? parseFloat(value) : (value as number)
+            if (isNaN(num)) return sum
+            return sum + num
+          }, 0)
+        },
+        valueFormatter: amountValueFormatter,
+        cellClass: "font-semibold tabular-nums",
+        cellStyle: {
+          textAlign: "right",
+          backgroundColor: "hsl(var(--muted) / 0.3)",
+        },
+      })
+
+      return cols
+    },
+    [columns, planFields]
+  )
+
+  // 全社合計用の行データ生成
+  const totalRowData = useMemo<MtpAmountRowData[]>(() => {
+    return subjects.map((subject) => {
+      const row: MtpAmountRowData = {
+        id: subject.id,
+        subjectCode: subject.subjectCode,
+        subjectName: subject.subjectName,
+        isAggregate: subject.isAggregate,
+        indentLevel: subject.indentLevel,
+        treePath: subject.treePath,
+      }
+
+      columns.forEach((col) => {
+        const fieldName = col.isActual ? `actual_${col.fiscalYear}` : `plan_${col.fiscalYear}`
+
+        if (col.isActual) {
+          // 実績列はデータから取得
+          const key = `dv-all-${subject.id}-${col.fiscalYear}`
+          row[fieldName] = parseFloat(localAmounts.get(key) || "0")
+        } else {
+          // 計画列はフロント側で集計
+          row[fieldName] = calculateTotalAmount(subject.id, col.fiscalYear)
+        }
+      })
+
+      return row
+    })
+  }, [subjects, columns, localAmounts, calculateTotalAmount])
+
+  // 事業部用の行データ生成
+  const createBuRowData = useCallback(
+    (data: BulkMtpAmountData): MtpAmountRowData[] => {
+      return subjects.map((subject) => {
+        const row: MtpAmountRowData = {
+          id: subject.id,
+          subjectCode: subject.subjectCode,
+          subjectName: subject.subjectName,
+          isAggregate: subject.isAggregate,
+          indentLevel: subject.indentLevel,
+          treePath: subject.treePath,
+        }
+
+        columns.forEach((col) => {
+          const fieldName = col.isActual ? `actual_${col.fiscalYear}` : `plan_${col.fiscalYear}`
+          const key = `${data.dimensionValueId}-${subject.id}-${col.fiscalYear}`
+          row[fieldName] = parseFloat(localAmounts.get(key) || "0")
+        })
+
+        return row
+      })
+    },
+    [subjects, columns, localAmounts]
+  )
+
+  // セル値変更時の処理
+  const handleCellValueChanged = useCallback(
+    (dimensionValueId: string) => (change: PendingChange) => {
+      const fiscalYear = parseInt(change.field.replace(/^plan_/, ""), 10)
+      const key = `${dimensionValueId}-${change.rowId}-${fiscalYear}`
+
+      // ローカル状態を更新
       setLocalAmounts((prev) => {
-        const next = new Map(prev)
-        next.set(key, parsedAmount)
-        return next
+        const updated = new Map(prev)
+        updated.set(key, change.newValue)
+        return updated
       })
 
       // 親に通知
-      onAmountChange(editingCell.dimensionValueId, editingCell.subjectId, editingCell.fiscalYear, parsedAmount)
-      setEditingCell(null)
-    }
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSave()
-    } else if (e.key === "Escape") {
-      setEditingCell(null)
-    }
-  }
-
-  // ディメンション値を並び替え（全社が最初）
-  const sortedDimensionValues = useMemo(() => {
-    const totalDv = dimensionValues.find((dv) => dv.valueCode === "ALL")
-    const otherDvs = dimensionValues.filter((dv) => dv.valueCode !== "ALL")
-    return totalDv ? [totalDv, ...otherDvs] : otherDvs
-  }, [dimensionValues])
-
-  // 共通テーブルヘッダー
-  const renderTableHeader = () => (
-    <tr className="border-b bg-muted/50">
-      <th className="sticky left-0 z-20 min-w-[180px] border-r bg-muted/50 p-3 text-left font-medium">科目</th>
-      {columns.map((col) => (
-        <th
-          key={`${col.fiscalYear}-${col.isActual}`}
-          className={cn("min-w-[100px] border-r p-3 text-right font-medium", col.isActual && "bg-muted/50")}
-        >
-          FY{col.fiscalYear}
-          <div className="text-xs font-normal text-muted-foreground">{col.isActual ? "(実績)" : "(計画)"}</div>
-        </th>
-      ))}
-      <th className="min-w-[100px] border-r bg-muted/30 p-3 text-right font-medium">計画合計</th>
-    </tr>
+      onAmountChange(dimensionValueId, change.rowId, fiscalYear, change.newValue)
+    },
+    [onAmountChange]
   )
 
-  // テーブル行レンダリング
-  const renderTableRow = (data: BulkMtpAmountData, subject: BffSubjectRow, isTotal: boolean) => {
-    // 計画列の合計を計算
-    const planTotal = columns
-      .filter((c) => !c.isActual)
-      .reduce((sum, col) => {
-        const amount = isTotal
-          ? calculateTotalAmount(subject.id, col.fiscalYear)
-          : getLocalAmount(data.dimensionValueId, subject.id, col.fiscalYear)
-        return sum + (Number(amount) || 0)
-      }, 0)
-
-    return (
-      <tr
-        key={`${data.dimensionValueId}-${subject.id}`}
-        className={cn("border-b hover:bg-muted/30", subject.isAggregate && "bg-muted/20")}
-      >
-        <td
-          className={cn(
-            "sticky left-0 z-10 border-r bg-background p-3 font-medium",
-            subject.isAggregate && "bg-muted/20 font-semibold",
-          )}
-        >
-          {subject.subjectName}
-        </td>
-
-        {columns.map((col) => {
-          const isEditing =
-            editingCell?.dimensionValueId === data.dimensionValueId &&
-            editingCell?.subjectId === subject.id &&
-            editingCell?.fiscalYear === col.fiscalYear
-
-          // 全社の場合はフロント側で集計（計画列のみ、実績列はデータから取得）
-          const amount =
-            isTotal && !col.isActual
-              ? calculateTotalAmount(subject.id, col.fiscalYear)
-              : getLocalAmount(data.dimensionValueId, subject.id, col.fiscalYear)
-
-          const canEdit = !data.isReadOnly && !subject.isAggregate && !col.isActual && !isTotal
-
-          return (
-            <td
-              key={`${col.fiscalYear}-${col.isActual}`}
-              className={cn(
-                "border-r p-3 text-right tabular-nums",
-                col.isActual && "bg-muted/10 text-muted-foreground",
-                canEdit && "cursor-pointer hover:bg-primary/5",
-                subject.isAggregate && "bg-muted/20 font-semibold",
-                isTotal && !col.isActual && "bg-primary/5 font-semibold",
-              )}
-              onClick={() => handleCellClick(data.dimensionValueId, subject.id, col.fiscalYear, col.isActual, subject.isAggregate)}
-            >
-              {isEditing ? (
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onBlur={handleSave}
-                  onKeyDown={handleKeyDown}
-                  className="w-full bg-transparent text-right outline-none focus:bg-accent"
-                  autoFocus
-                />
-              ) : (
-                formatAmount(amount)
-              )}
-            </td>
-          )
-        })}
-
-        <td
-          className={cn(
-            "border-r bg-muted/30 p-3 text-right tabular-nums font-semibold",
-            subject.isAggregate && "font-bold",
-          )}
-        >
-          {formatAmount(String(planTotal))}
-        </td>
-      </tr>
-    )
-  }
+  // 列定義（全社用・読み取り専用）
+  const totalColumnDefs = useMemo(() => createColumnDefs(true, true), [createColumnDefs])
 
   return (
     <div className="space-y-4">
@@ -256,12 +259,16 @@ export function MtpBulkAmountGrid({ dimensionValues, bulkData, onAmountChange }:
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-sm">
-                <thead>{renderTableHeader()}</thead>
-                <tbody>{subjects.map((subject) => renderTableRow(totalData, subject, true))}</tbody>
-              </table>
-            </div>
+            <EditableAmountGrid<MtpAmountRowData>
+              rowData={totalRowData}
+              columnDefs={totalColumnDefs}
+              isReadOnly={true}
+              height={Math.min(300, 80 + subjects.length * 36)}
+              getRowId={(data) => data.id}
+              treeData={true}
+              getDataPath={getDataPath}
+              groupDefaultExpanded={1}
+            />
           </CardContent>
         </Card>
       )}
@@ -277,6 +284,9 @@ export function MtpBulkAmountGrid({ dimensionValues, bulkData, onAmountChange }:
             const data = bulkData.find((d) => d.dimensionValueId === dv.id)
             if (!data) return null
 
+            const buColumnDefs = createColumnDefs(false, data.isReadOnly)
+            const buRowData = createBuRowData(data)
+
             return (
               <AccordionItem key={dv.id} value={dv.id}>
                 <AccordionTrigger className="px-4 py-3 hover:no-underline">
@@ -286,11 +296,18 @@ export function MtpBulkAmountGrid({ dimensionValues, bulkData, onAmountChange }:
                   </div>
                 </AccordionTrigger>
                 <AccordionContent>
-                  <div className="overflow-x-auto border-t">
-                    <table className="w-full border-collapse text-sm">
-                      <thead>{renderTableHeader()}</thead>
-                      <tbody>{subjects.map((subject) => renderTableRow(data, subject, false))}</tbody>
-                    </table>
+                  <div className="border-t">
+                    <EditableAmountGrid<MtpAmountRowData>
+                      rowData={buRowData}
+                      columnDefs={buColumnDefs}
+                      isReadOnly={data.isReadOnly}
+                      height={Math.min(300, 80 + subjects.length * 36)}
+                      onCellValueChanged={handleCellValueChanged(dv.id)}
+                      getRowId={(data) => data.id}
+                      treeData={true}
+                      getDataPath={getDataPath}
+                      groupDefaultExpanded={1}
+                    />
                   </div>
                 </AccordionContent>
               </AccordionItem>

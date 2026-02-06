@@ -330,3 +330,31 @@ export interface ApiKpiDefinitionOption {
 export interface ApiKpiDefinitionOptionListDto {
   items: ApiKpiDefinitionOption[];
 }
+
+/** 科目（財務）選択肢 */
+export interface ApiSubjectSelectorOption {
+  stableId: string;
+  subjectCode: string;
+  subjectName: string;
+  parentStableId: string | null;
+  level: number;
+}
+
+/** 科目選択肢レスポンスDTO */
+export interface ApiSubjectSelectorResponse {
+  items: ApiSubjectSelectorOption[];
+}
+
+/** 指標（メトリクス）選択肢 */
+export interface ApiMetricSelectorOption {
+  id: string;
+  metricCode: string;
+  metricName: string;
+  metricType: 'FIN_METRIC' | 'KPI_METRIC';
+  unit: string | null;
+}
+
+/** 指標選択肢レスポンスDTO */
+export interface ApiMetricSelectorResponse {
+  items: ApiMetricSelectorOption[];
+}

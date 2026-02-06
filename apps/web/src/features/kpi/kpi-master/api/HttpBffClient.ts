@@ -21,13 +21,35 @@ import type {
  */
 export class HttpBffClient implements BffClient {
   private baseUrl: string
+  private tenantId: string
+  private userId: string
+  private companyId: string
 
-  constructor(baseUrl: string = '/api/bff/kpi-master') {
+  constructor(
+    baseUrl: string = '/api/bff/kpi-master',
+    tenantId: string = '11111111-1111-1111-1111-111111111111',
+    userId: string = '22222222-2222-2222-2222-222222222222',
+    companyId: string = '33333333-3333-3333-3333-333333333333'
+  ) {
     this.baseUrl = baseUrl
+    this.tenantId = tenantId
+    this.userId = userId
+    this.companyId = companyId
+  }
+
+  private getHeaders(): HeadersInit {
+    return {
+      'Content-Type': 'application/json',
+      'x-tenant-id': this.tenantId,
+      'x-user-id': this.userId,
+      'x-company-id': this.companyId,
+    }
   }
 
   async getEvents(): Promise<BffKpiEvent[]> {
-    const response = await fetch(`${this.baseUrl}/events`)
+    const response = await fetch(`${this.baseUrl}/events`, {
+      headers: this.getHeaders(),
+    })
     if (!response.ok) throw new Error('Failed to fetch events')
     const data = await response.json()
     return data.items
@@ -36,7 +58,7 @@ export class HttpBffClient implements BffClient {
   async createEvent(request: BffCreateKpiEventRequest): Promise<BffKpiEvent> {
     const response = await fetch(`${this.baseUrl}/events`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getHeaders(),
       body: JSON.stringify(request),
     })
     if (!response.ok) throw new Error('Failed to create event')
@@ -48,19 +70,25 @@ export class HttpBffClient implements BffClient {
     if (departmentStableIds?.length) {
       departmentStableIds.forEach(id => params.append('departmentStableIds', id))
     }
-    const response = await fetch(`${this.baseUrl}/items?${params}`)
+    const response = await fetch(`${this.baseUrl}/items?${params}`, {
+      headers: this.getHeaders(),
+    })
     if (!response.ok) throw new Error('Failed to fetch KPI list')
     return response.json()
   }
 
   async getKpiDetail(kpiItemId: string): Promise<BffKpiDetail> {
-    const response = await fetch(`${this.baseUrl}/items/${kpiItemId}`)
+    const response = await fetch(`${this.baseUrl}/items/${kpiItemId}`, {
+      headers: this.getHeaders(),
+    })
     if (!response.ok) throw new Error('Failed to fetch KPI detail')
     return response.json()
   }
 
   async getKpiItems(eventId: string): Promise<BffKpiItem[]> {
-    const response = await fetch(`${this.baseUrl}/items?eventId=${eventId}`)
+    const response = await fetch(`${this.baseUrl}/items?eventId=${eventId}`, {
+      headers: this.getHeaders(),
+    })
     if (!response.ok) throw new Error('Failed to fetch KPI items')
     const data = await response.json()
     return data.items ?? data
@@ -69,7 +97,7 @@ export class HttpBffClient implements BffClient {
   async createKpiItem(request: BffCreateKpiItemRequest): Promise<BffKpiItem> {
     const response = await fetch(`${this.baseUrl}/items`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getHeaders(),
       body: JSON.stringify(request),
     })
     if (!response.ok) throw new Error('Failed to create KPI item')
@@ -79,7 +107,7 @@ export class HttpBffClient implements BffClient {
   async updateKpiItem(id: string, request: Partial<BffCreateKpiItemRequest>): Promise<BffKpiItem> {
     const response = await fetch(`${this.baseUrl}/items/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getHeaders(),
       body: JSON.stringify(request),
     })
     if (!response.ok) throw new Error('Failed to update KPI item')
@@ -89,6 +117,7 @@ export class HttpBffClient implements BffClient {
   async deleteKpiItem(id: string): Promise<void> {
     const response = await fetch(`${this.baseUrl}/items/${id}`, {
       method: 'DELETE',
+      headers: this.getHeaders(),
     })
     if (!response.ok) throw new Error('Failed to delete KPI item')
   }
@@ -96,7 +125,7 @@ export class HttpBffClient implements BffClient {
   async updateFactAmount(factId: string, targetValue?: number, actualValue?: number): Promise<void> {
     const response = await fetch(`${this.baseUrl}/fact-amounts/${factId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getHeaders(),
       body: JSON.stringify({ targetValue, actualValue }),
     })
     if (!response.ok) throw new Error('Failed to update fact amount')
@@ -105,7 +134,7 @@ export class HttpBffClient implements BffClient {
   async createPeriod(kpiItemId: string, periodCode: string, targetValue?: number): Promise<void> {
     const response = await fetch(`${this.baseUrl}/fact-amounts`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getHeaders(),
       body: JSON.stringify({ kpiMasterItemId: kpiItemId, periodCode, targetValue }),
     })
     if (!response.ok) throw new Error('Failed to create period')
@@ -114,34 +143,42 @@ export class HttpBffClient implements BffClient {
   async createActionPlan(request: BffCreateActionPlanRequest): Promise<void> {
     const response = await fetch('/api/bff/action-plan-core/plans', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getHeaders(),
       body: JSON.stringify(request),
     })
     if (!response.ok) throw new Error('Failed to create action plan')
   }
 
   async getSelectableSubjects(): Promise<BffSelectOption[]> {
-    const response = await fetch(`${this.baseUrl}/selectable-subjects`)
+    const response = await fetch(`${this.baseUrl}/selectable-subjects`, {
+      headers: this.getHeaders(),
+    })
     if (!response.ok) throw new Error('Failed to fetch subjects')
     return response.json()
   }
 
   async getSelectableKpiDefinitions(): Promise<BffSelectOption[]> {
-    const response = await fetch(`${this.baseUrl}/kpi-definitions`)
+    const response = await fetch(`${this.baseUrl}/kpi-definitions`, {
+      headers: this.getHeaders(),
+    })
     if (!response.ok) throw new Error('Failed to fetch KPI definitions')
     const data = await response.json()
     return data.items ?? data
   }
 
   async getSelectableMetrics(): Promise<BffSelectOption[]> {
-    const response = await fetch(`${this.baseUrl}/selectable-metrics`)
+    const response = await fetch(`${this.baseUrl}/selectable-metrics`, {
+      headers: this.getHeaders(),
+    })
     if (!response.ok) throw new Error('Failed to fetch metrics')
     return response.json()
   }
 
   async getDepartments(): Promise<BffDepartment[]> {
     // Use shared departments endpoint
-    const response = await fetch('/api/bff/master-data/departments')
+    const response = await fetch('/api/bff/master-data/departments', {
+      headers: this.getHeaders(),
+    })
     if (!response.ok) throw new Error('Failed to fetch departments')
     const data = await response.json()
     return data.items ?? data
@@ -149,7 +186,9 @@ export class HttpBffClient implements BffClient {
 
   async getEmployees(): Promise<BffEmployee[]> {
     // Use shared employees endpoint
-    const response = await fetch('/api/bff/master-data/employees')
+    const response = await fetch('/api/bff/master-data/employees', {
+      headers: this.getHeaders(),
+    })
     if (!response.ok) throw new Error('Failed to fetch employees')
     const data = await response.json()
     return data.items ?? data

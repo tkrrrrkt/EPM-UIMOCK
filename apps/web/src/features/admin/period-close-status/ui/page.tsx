@@ -12,11 +12,19 @@ import {
   SelectValue,
   useToast,
 } from '@/shared/ui'
-import { PeriodCloseStatusList, CloseConfirmDialog, ReopenConfirmDialog, AllocationConfirmDialog } from './components'
+import {
+  PeriodCloseStatusList,
+  CloseConfirmDialog,
+  ReopenConfirmDialog,
+  AllocationExecuteDialog,
+  UnlockInputDialog,
+  AllocationResultPage,
+} from './components'
 import { bffClient } from './api'
 import type {
   BffPeriodCloseStatus,
   BffFiscalYear,
+  BffAllocationEvent,
 } from '@epm/contracts/bff/period-close-status'
 
 export default function PeriodCloseStatusPage() {
@@ -26,16 +34,12 @@ export default function PeriodCloseStatusPage() {
 
   // Data state
   const [periods, setPeriods] = useState<BffPeriodCloseStatus[]>([])
-  const [companyId, setCompanyId] = useState<string>('company-001')
+  const [companyId] = useState<string>('company-001')
   const [companyName, setCompanyName] = useState<string>('')
   const [fiscalYears, setFiscalYears] = useState<BffFiscalYear[]>([])
   const [selectedFiscalYear, setSelectedFiscalYear] = useState<number | null>(null)
 
-  // Dialog state
-  const [softCloseDialog, setSoftCloseDialog] = useState<{
-    open: boolean
-    period: BffPeriodCloseStatus | null
-  }>({ open: false, period: null })
+  // Dialog state（仮締め廃止：本締めと差し戻しのみ）
   const [hardCloseDialog, setHardCloseDialog] = useState<{
     open: boolean
     period: BffPeriodCloseStatus | null
@@ -48,6 +52,16 @@ export default function PeriodCloseStatusPage() {
     open: boolean
     period: BffPeriodCloseStatus | null
   }>({ open: false, period: null })
+  const [unlockDialog, setUnlockDialog] = useState<{
+    open: boolean
+    period: BffPeriodCloseStatus | null
+  }>({ open: false, period: null })
+
+  // View mode state
+  const [viewMode, setViewMode] = useState<{
+    mode: 'list' | 'allocation-result'
+    period: BffPeriodCloseStatus | null
+  }>({ mode: 'list', period: null })
 
   // Load fiscal years on mount
   useEffect(() => {
@@ -97,9 +111,9 @@ export default function PeriodCloseStatusPage() {
     }
   }
 
-  const handleSoftClose = useCallback((period: BffPeriodCloseStatus) => {
-    setSoftCloseDialog({ open: true, period })
-  }, [])
+  // ============================================================================
+  // 締め処理ハンドラ（本締め・差し戻しのみ）
+  // ============================================================================
 
   const handleHardClose = useCallback((period: BffPeriodCloseStatus) => {
     setHardCloseDialog({ open: true, period })
@@ -108,41 +122,6 @@ export default function PeriodCloseStatusPage() {
   const handleReopen = useCallback((period: BffPeriodCloseStatus) => {
     setReopenDialog({ open: true, period })
   }, [])
-
-  const executeSoftClose = async () => {
-    const period = softCloseDialog.period
-    if (!period) return
-
-    setOperationLoading(true)
-    try {
-      const response = await bffClient.softClose({
-        accountingPeriodId: period.accountingPeriodId,
-      })
-
-      if (response.success) {
-        toast({
-          title: '仮締め完了',
-          description: `${period.periodLabel}を仮締めしました`,
-        })
-        await loadPeriods()
-      } else {
-        toast({
-          title: 'エラー',
-          description: response.errorMessage || '仮締めに失敗しました',
-          variant: 'destructive',
-        })
-      }
-    } catch (error) {
-      toast({
-        title: 'エラー',
-        description: '仮締めに失敗しました',
-        variant: 'destructive',
-      })
-    } finally {
-      setOperationLoading(false)
-      setSoftCloseDialog({ open: false, period: null })
-    }
-  }
 
   const executeHardClose = async () => {
     const period = hardCloseDialog.period
@@ -215,38 +194,105 @@ export default function PeriodCloseStatusPage() {
     }
   }
 
-  const executeAllocation = async (dryRun: boolean) => {
-    const period = allocationDialog.period
-    if (!period) throw new Error('期間が選択されていません')
-
-    const response = await bffClient.runAllocation({
-      accountingPeriodId: period.accountingPeriodId,
-      dryRun,
-    })
-
-    if (response.success && !dryRun) {
-      toast({
-        title: '配賦処理完了',
-        description: `${period.periodLabel}の配賦処理を実行しました`,
-      })
-      setAllocationDialog({ open: false, period: null })
-    } else if (!response.success) {
-      toast({
-        title: 'エラー',
-        description: response.errorMessage || '配賦処理に失敗しました',
-        variant: 'destructive',
-      })
-    }
-
-    return response
-  }
+  // ============================================================================
+  // 配賦処理ハンドラ
+  // ============================================================================
 
   const handleAllocation = useCallback((period: BffPeriodCloseStatus) => {
     setAllocationDialog({ open: true, period })
   }, [])
 
+  const handleViewResult = useCallback((period: BffPeriodCloseStatus) => {
+    setViewMode({ mode: 'allocation-result', period })
+  }, [])
+
+  const handleUnlockInput = useCallback((period: BffPeriodCloseStatus) => {
+    setUnlockDialog({ open: true, period })
+  }, [])
+
+  const handleAllocationSettings = useCallback(() => {
+    // TODO: 配賦設定画面に遷移
+    // router.push('/master-data/allocation-master')
+    toast({
+      title: '配賦設定',
+      description: '配賦マスタ設定画面へ遷移します（実装予定）',
+    })
+  }, [toast])
+
+  const loadAllocationEvents = useCallback(async (): Promise<BffAllocationEvent[]> => {
+    const response = await bffClient.listAllocationEvents({
+      companyId,
+      scenarioType: 'ACTUAL',
+    })
+    return response.events
+  }, [companyId])
+
+  const executeAllocation = useCallback(async (eventIds: string[]) => {
+    const period = allocationDialog.period
+    if (!period) throw new Error('期間が選択されていません')
+
+    const response = await bffClient.executeAllocation({
+      companyId,
+      accountingPeriodId: period.accountingPeriodId,
+      eventIds,
+    })
+
+    return response
+  }, [companyId, allocationDialog.period])
+
+  const handleAllocationSuccess = useCallback(async () => {
+    const period = allocationDialog.period
+    toast({
+      title: '配賦処理完了',
+      description: `${period?.periodLabel}の配賦処理を実行しました`,
+    })
+    await loadPeriods()
+    // 配賦結果VIEW画面に遷移
+    if (period) {
+      setViewMode({ mode: 'allocation-result', period })
+    }
+  }, [allocationDialog.period, toast, loadPeriods])
+
+  const handleBackToList = useCallback(() => {
+    setViewMode({ mode: 'list', period: null })
+  }, [])
+
+  const executeUnlockInput = useCallback(async () => {
+    const period = unlockDialog.period
+    if (!period) return
+
+    const response = await bffClient.unlockInput({
+      accountingPeriodId: period.accountingPeriodId,
+    })
+
+    if (response.success) {
+      toast({
+        title: '入力ロック解除完了',
+        description: `${period.periodLabel}の入力ロックを解除しました`,
+      })
+      await loadPeriods()
+    } else {
+      toast({
+        title: 'エラー',
+        description: response.errorMessage || '入力ロック解除に失敗しました',
+        variant: 'destructive',
+      })
+    }
+  }, [unlockDialog.period, toast, loadPeriods])
+
+  // Show allocation result view
+  if (viewMode.mode === 'allocation-result' && viewMode.period) {
+    return (
+      <AllocationResultPage
+        companyId={companyId}
+        accountingPeriodId={viewMode.period.accountingPeriodId}
+        onBack={handleBackToList}
+      />
+    )
+  }
+
   return (
-    <div className="container mx-auto py-8 space-y-6 max-w-[1400px]">
+    <div className="container mx-auto py-8 space-y-6 max-w-[1600px]">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">月次締処理状況</h1>
@@ -287,36 +333,28 @@ export default function PeriodCloseStatusPage() {
 
         <div className="mb-4">
           <p className="text-sm text-muted-foreground">
-            凡例: <span className="inline-flex items-center gap-1 mx-2">未締め(OPEN)</span> /
-            <span className="inline-flex items-center gap-1 mx-2">仮締め(SOFT_CLOSED)</span> /
-            <span className="inline-flex items-center gap-1 mx-2">本締め(HARD_CLOSED)</span>
+            凡例: 未締め(OPEN) / 本締め(HARD_CLOSED) /
+            <span className="inline-flex items-center gap-1 mx-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">ロック中</span>
+            = 配賦済み（入力不可）
           </p>
         </div>
 
         <PeriodCloseStatusList
           periods={periods}
           loading={loading || operationLoading}
-          onSoftClose={handleSoftClose}
           onHardClose={handleHardClose}
           onReopen={handleReopen}
           onAllocation={handleAllocation}
+          onViewResult={handleViewResult}
+          onUnlockInput={handleUnlockInput}
+          onAllocationSettings={handleAllocationSettings}
         />
       </Card>
 
-      {/* Dialogs */}
-      <CloseConfirmDialog
-        open={softCloseDialog.open}
-        onOpenChange={(open) => setSoftCloseDialog({ open, period: open ? softCloseDialog.period : null })}
-        type="soft"
-        periodLabel={softCloseDialog.period?.periodLabel ?? ''}
-        onConfirm={executeSoftClose}
-        loading={operationLoading}
-      />
-
+      {/* Dialogs（本締め・差し戻しのみ） */}
       <CloseConfirmDialog
         open={hardCloseDialog.open}
         onOpenChange={(open) => setHardCloseDialog({ open, period: open ? hardCloseDialog.period : null })}
-        type="hard"
         periodLabel={hardCloseDialog.period?.periodLabel ?? ''}
         onConfirm={executeHardClose}
         loading={operationLoading}
@@ -330,11 +368,24 @@ export default function PeriodCloseStatusPage() {
         loading={operationLoading}
       />
 
-      <AllocationConfirmDialog
+      <AllocationExecuteDialog
         open={allocationDialog.open}
         onOpenChange={(open) => setAllocationDialog({ open, period: open ? allocationDialog.period : null })}
         periodLabel={allocationDialog.period?.periodLabel ?? ''}
+        companyId={companyId}
+        accountingPeriodId={allocationDialog.period?.accountingPeriodId ?? ''}
+        hasExistingResult={allocationDialog.period?.hasAllocationResult ?? false}
+        onLoadEvents={loadAllocationEvents}
         onExecute={executeAllocation}
+        onSuccess={handleAllocationSuccess}
+        loading={operationLoading}
+      />
+
+      <UnlockInputDialog
+        open={unlockDialog.open}
+        onOpenChange={(open) => setUnlockDialog({ open, period: open ? unlockDialog.period : null })}
+        periodLabel={unlockDialog.period?.periodLabel ?? ''}
+        onConfirm={executeUnlockInput}
         loading={operationLoading}
       />
     </div>
